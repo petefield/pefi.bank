@@ -1,0 +1,145 @@
+@page "/transfer"
+@inject BankApiClient Api
+@inject CustomerState State
+
+<h2>Transfer Funds</h2>
+
+@if (!State.IsLoggedIn)
+{
+    <p>Please <a href="">sign in</a> first.</p>
+}
+else if (accounts == null)
+{
+    <p>Loading accounts...</p>
+}
+else if (accounts.Count < 2)
+{
+    <p>You need at least two accounts to make a transfer. <a href="accounts">Open an account</a>.</p>
+}
+else
+{
+    <div style="padding: 16px; border: 1px solid #dee2e6; border-radius: 6px; max-width: 450px;">
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Source Account</label>
+                <select @bind="sourceAccountId" style="width: 100%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;">
+                    <option value="">-- Select source --</option>
+                    @foreach (var acct in accounts.Where(a => !a.IsClosed))
+                    {
+                        <option value="@acct.Id">@acct.AccountName (@acct.Balance.ToString("C"))</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Destination Account</label>
+                <select @bind="destinationAccountId" style="width: 100%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;">
+                    <option value="">-- Select destination --</option>
+                    @foreach (var acct in accounts.Where(a => !a.IsClosed))
+                    {
+                        <option value="@acct.Id">@acct.AccountName (@acct.Balance.ToString("C"))</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Amount</label>
+                <input type="number" step="0.01" min="0.01" @bind="amount"
+                       style="width: 100%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
+                <input type="text" @bind="description" placeholder="Optional description"
+                       style="width: 100%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
+            </div>
+
+            <button class="btn btn-primary" @onclick="SubmitTransfer" disabled="@isLoading">
+                @(isLoading ? "Processing..." : "Transfer")
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div style="margin-top: 12px; padding: 10px; background-color: #d1e7dd; color: #0f5132; border-radius: 4px; max-width: 450px;">
+            @message
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="margin-top: 12px; padding: 10px; background-color: #f8d7da; color: #842029; border-radius: 4px; max-width: 450px;">
+            @errorMessage
+        </div>
+    }
+}
+
+@code {
+    private List<AccountReadModel>? accounts;
+    private string sourceAccountId = string.Empty;
+    private string destinationAccountId = string.Empty;
+    private decimal amount;
+    private string description = string.Empty;
+    private string? message;
+    private string? errorMessage;
+    private bool isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (State.IsLoggedIn)
+        {
+            accounts = await Api.GetAccountsAsync(State.CustomerId!.Value);
+        }
+    }
+
+    private async Task SubmitTransfer()
+    {
+        message = null;
+        errorMessage = null;
+
+        if (string.IsNullOrEmpty(sourceAccountId) || string.IsNullOrEmpty(destinationAccountId))
+        {
+            errorMessage = "Please select both source and destination accounts.";
+            return;
+        }
+
+        if (sourceAccountId == destinationAccountId)
+        {
+            errorMessage = "Source and destination must be different accounts.";
+            return;
+        }
+
+        if (amount <= 0)
+        {
+            errorMessage = "Amount must be greater than zero.";
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            var command = new TransferCommand(
+                Guid.Parse(sourceAccountId),
+                Guid.Parse(destinationAccountId),
+                amount,
+                description);
+
+            await Api.TransferAsync(command);
+            message = $"Transfer of {amount:C} completed successfully.";
+            amount = 0;
+            description = string.Empty;
+            sourceAccountId = string.Empty;
+            destinationAccountId = string.Empty;
+            accounts = await Api.GetAccountsAsync(State.CustomerId!.Value);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Transfer failed: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

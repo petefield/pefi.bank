@@ -1,0 +1,84 @@
+using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.DependencyInjection;
+using Pefi.Bank.Domain;
+using Pefi.Bank.Infrastructure.EventStore;
+using Pefi.Bank.Infrastructure.ReadStore;
+
+namespace Pefi.Bank.Infrastructure;
+
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddCosmosInfrastructure(
+        this IServiceCollection services,
+        string connectionString,
+        string databaseName)
+    {
+        services.AddSingleton<CosmosClient>(sp =>
+        {
+            var options = new CosmosClientOptions
+            {
+                SerializerOptions = new CosmosSerializationOptions
+                {
+                    PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase
+                },
+                HttpClientFactory = () =>
+                {
+                    // Allow self-signed certs for local emulator
+                    var handler = new HttpClientHandler
+                    {
+                        ServerCertificateCustomValidationCallback =
+                            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                    };
+                    return new HttpClient(handler);
+                },
+                ConnectionMode = ConnectionMode.Gateway
+            };
+
+            return new CosmosClient(connectionString, options);
+        });
+
+        services.AddSingleton<IEventStore>(sp =>
+        {
+            var client = sp.GetRequiredService<CosmosClient>();
+            var container = client.GetContainer(databaseName, "events");
+            return new CosmosEventStore(container);
+        });
+
+        services.AddSingleton<IReadStore>(sp =>
+        {
+            var client = sp.GetRequiredService<CosmosClient>();
+            var container = client.GetContainer(databaseName, "readmodels");
+            return new CosmosReadStore(container);
+        });
+
+        services.AddScoped(typeof(IAggregateRepository<>), typeof(AggregateRepository<>));
+
+        return services;
+    }
+
+    public static async Task InitializeCosmosAsync(this IServiceProvider services, string databaseName)
+    {
+        var client = services.GetService<CosmosClient>();
+        if (client is null)
+            return; // Skip initialization when CosmosDB is not configured (e.g. tests)
+
+        var database = await client.CreateDatabaseIfNotExistsAsync(databaseName);
+
+        await database.Database.CreateContainerIfNotExistsAsync(
+            new ContainerProperties("events", "/streamId")
+            {
+                UniqueKeyPolicy = new UniqueKeyPolicy
+                {
+                    UniqueKeys =
+                    {
+                        new UniqueKey { Paths = { "/streamId", "/version" } }
+                    }
+                }
+            });
+
+        await database.Database.CreateContainerIfNotExistsAsync(
+            new ContainerProperties("readmodels", "/partitionKey"));
+
+        // Enable change feed on the events container — inherently supported by CosmosDB
+    }
+}

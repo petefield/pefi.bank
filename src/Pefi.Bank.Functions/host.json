@@ -1,0 +1,11 @@
+{
+  "version": "2.0",
+  "logging": {
+    "logLevel": {
+      "default": "Information",
+      "Host.Triggers.CosmosDB": "Debug",
+      "Microsoft.Azure.WebJobs.Extensions.CosmosDB": "Debug",
+      "Function.ProjectEvents": "Debug"
+    }
+  }
+}

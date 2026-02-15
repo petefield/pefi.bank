@@ -1,0 +1,133 @@
+services:
+  cosmosdb:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+    container_name: pefi-cosmosdb
+    ports:
+      - "8081:8081"
+      - "10250-10255:10250-10255"
+    environment:
+      - AZURE_COSMOS_EMULATOR_PARTITION_COUNT=10
+      - AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=true
+    volumes:
+      - cosmosdb-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sk https://localhost:8081/_explorer/emulator.pem || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: pefi-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: pefi-redisinsight
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redisinsight-init:
+    image: curlimages/curl:latest
+    container_name: pefi-redisinsight-init
+    depends_on:
+      - redisinsight
+    restart: "no"
+    entrypoint: >
+      sh -c "
+        echo 'Waiting for RedisInsight...' &&
+        until curl -sf http://redisinsight:5540/api/databases > /dev/null 2>&1; do sleep 1; done &&
+        echo 'Adding Redis connection...' &&
+        curl -sf -X POST http://redisinsight:5540/api/databases
+        -H 'Content-Type: application/json'
+        -d '{\"host\":\"redis\",\"port\":6379,\"name\":\"pefi-redis\"}' &&
+        echo 'Done.'
+      "
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: pefi-azurite
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0"
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Pefi.Bank.Api/Dockerfile
+    container_name: pefi-api
+    ports:
+      - "5100:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__CosmosDb=AccountEndpoint=https://cosmosdb:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+      - CosmosDb__DatabaseName=pefibank
+      - Redis__ConnectionString=redis:6379
+    depends_on:
+      cosmosdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
+
+  functions:
+    build:
+      context: .
+      dockerfile: src/Pefi.Bank.Functions/Dockerfile
+    container_name: pefi-functions
+    network_mode: "service:cosmosdb"
+    environment:
+      - AzureWebJobsStorage=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1
+      - CosmosDBConnection=AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+      - CosmosDb__ConnectionString=AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+      - CosmosDb__DatabaseName=pefibank
+      - COSMOSDB_EMULATOR_HOST=localhost:8081
+      - AzureFunctionsJobHost__logging__console__isEnabled=true
+      - AZURE_FUNCTIONS_ENVIRONMENT=Development
+      - Redis__ConnectionString=redis:6379
+    depends_on:
+      cosmosdb:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    restart: on-failure
+
+  customer-portal:
+    build:
+      context: .
+      dockerfile: src/Pefi.Bank.CustomerPortal/Dockerfile
+    container_name: pefi-customer-portal
+    ports:
+      - "5200:80"
+    depends_on:
+      - api
+
+  admin-portal:
+    build:
+      context: .
+      dockerfile: src/Pefi.Bank.AdminPortal/Dockerfile
+    container_name: pefi-admin-portal
+    ports:
+      - "5300:80"
+    depends_on:
+      - api
+
+volumes:
+  cosmosdb-data:
+  redisinsight-data:

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.46.1" />
+    <PackageReference Include="StackExchange.Redis" Version="2.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pefi.Bank.Domain\Pefi.Bank.Domain.csproj" />
+    <ProjectReference Include="..\Pefi.Bank.Infrastructure\Pefi.Bank.Infrastructure.csproj" />
+    <ProjectReference Include="..\Pefi.Bank.Shared\Pefi.Bank.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

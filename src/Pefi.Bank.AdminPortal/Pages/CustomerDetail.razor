@@ -1,0 +1,177 @@
+@page "/customers/{Id:guid}"
+@inject AdminApiClient Api
+
+<PageTitle>Customer Detail - Pefi Bank Admin</PageTitle>
+
+<a href="customers" style="display: inline-block; margin-bottom: 16px; text-decoration: none;">&larr; Back to Customers</a>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_error is not null)
+{
+    <p style="color: red;">Error: @_error</p>
+}
+else if (_customer is null)
+{
+    <p>Customer not found.</p>
+}
+else
+{
+    <h1 style="margin-bottom: 8px;">@_customer.FirstName @_customer.LastName</h1>
+    <p style="color: #777; margin-bottom: 24px;">@_customer.Email &middot; Customer since @_customer.CreatedAt.ToString("yyyy-MM-dd")</p>
+
+    <h2 style="margin-bottom: 12px;">Accounts</h2>
+
+    @if (_accounts.Count == 0)
+    {
+        <p>No accounts.</p>
+    }
+    else
+    {
+        <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 24px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Account Name</th>
+                        <th>Balance</th>
+                        <th>Status</th>
+                        <th>Opened</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var account in _accounts)
+                    {
+                        <tr>
+                            <td>@account.AccountName</td>
+                            <td>@account.Balance.ToString("C")</td>
+                            <td>
+                                @if (account.IsClosed)
+                                {
+                                    <span style="color: #c0392b; font-weight: 600;">Closed</span>
+                                }
+                                else
+                                {
+                                    <span style="color: #27ae60; font-weight: 600;">Open</span>
+                                }
+                            </td>
+                            <td>@account.OpenedAt.ToString("yyyy-MM-dd")</td>
+                            <td>
+                                <button @onclick="() => ToggleTransactions(account.Id)"
+                                        style="background: #1a5276; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
+                                    @(_selectedAccountId == account.Id ? "Hide" : "Transactions")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (_selectedAccountId is not null)
+    {
+        <h3 style="margin-bottom: 12px;">
+            Transactions for @(_accounts.FirstOrDefault(a => a.Id == _selectedAccountId)?.AccountName)
+        </h3>
+
+        @if (_loadingTransactions)
+        {
+            <p>Loading transactions...</p>
+        }
+        else if (_transactions.Count == 0)
+        {
+            <p>No transactions.</p>
+        }
+        else
+        {
+            <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Balance After</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tx in _transactions)
+                        {
+                            <tr>
+                                <td>@tx.OccurredAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@tx.Type</td>
+                                <td>@tx.Description</td>
+                                <td>@tx.Amount.ToString("C")</td>
+                                <td>@tx.BalanceAfter.ToString("C")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private CustomerReadModel? _customer;
+    private List<AccountReadModel> _accounts = [];
+    private List<TransactionReadModel> _transactions = [];
+    private Guid? _selectedAccountId;
+    private bool _loading = true;
+    private bool _loadingTransactions;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _customer = await Api.GetCustomerAsync(Id);
+            if (_customer is not null)
+            {
+                _accounts = await Api.GetCustomerAccountsAsync(Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ToggleTransactions(Guid accountId)
+    {
+        if (_selectedAccountId == accountId)
+        {
+            _selectedAccountId = null;
+            _transactions = [];
+            return;
+        }
+
+        _selectedAccountId = accountId;
+        _loadingTransactions = true;
+        _transactions = [];
+
+        try
+        {
+            _transactions = await Api.GetAccountTransactionsAsync(accountId);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loadingTransactions = false;
+        }
+    }
+}

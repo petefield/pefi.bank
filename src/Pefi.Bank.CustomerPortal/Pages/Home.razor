@@ -1,0 +1,194 @@
+@page "/"
+@inject BankApiClient Api
+@inject CustomerState State
+
+<h2>Welcome to Pefi Bank</h2>
+
+@if (!State.IsLoggedIn)
+{
+    <div style="margin-top: 20px;">
+        <h4>Sign In</h4>
+        <p>Enter your Customer ID to continue:</p>
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
+            <input type="text" @bind="customerIdInput" placeholder="Customer ID (Guid)" 
+                   style="padding: 6px 10px; width: 340px; border: 1px solid #ccc; border-radius: 4px;" />
+            <button class="btn btn-primary btn-sm" @onclick="SignIn">Sign In</button>
+        </div>
+
+        <hr />
+
+        <h4>Register New Customer</h4>
+        <div style="display: flex; flex-direction: column; gap: 8px; max-width: 340px;">
+            <input type="text" @bind="firstName" placeholder="First Name"
+                   style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
+            <input type="text" @bind="lastName" placeholder="Last Name"
+                   style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
+            <input type="email" @bind="email" placeholder="Email"
+                   style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
+            <button class="btn btn-primary btn-sm" @onclick="Register" disabled="@(isLoading || isWaitingForConfirmation)">
+                @(isLoading ? "Creating..." : "Register")
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    @if (customer != null)
+    {
+        <div style="margin-top: 16px; padding: 16px; border: 1px solid #dee2e6; border-radius: 6px; max-width: 500px;">
+            <h4>@customer.FirstName @customer.LastName</h4>
+            <p style="margin: 4px 0; color: #666;">@customer.Email</p>
+            <p style="margin: 4px 0;">Accounts: @customer.AccountCount</p>
+            <p style="margin: 4px 0; font-size: 0.85rem; color: #999;">Member since @customer.CreatedAt.ToString("yyyy-MM-dd")</p>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" style="margin-top: 12px;" @onclick="SignOut">Sign Out</button>
+    }
+    else if (isLoading)
+    {
+        <p>Loading customer details...</p>
+    }
+}
+
+@if (isWaitingForConfirmation)
+{
+    <div style="margin-top: 16px; padding: 16px; border: 1px solid #0d6efd; border-radius: 6px; max-width: 400px; background-color: #cfe2ff;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Processing...</span>
+            </div>
+            <span>Setting up your account, please wait...</span>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div style="margin-top: 12px; padding: 10px; background-color: #f8d7da; color: #842029; border-radius: 4px;">
+        @errorMessage
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div style="margin-top: 12px; padding: 10px; background-color: #d1e7dd; color: #0f5132; border-radius: 4px;">
+        @successMessage
+    </div>
+}
+
+@code {
+    private string customerIdInput = string.Empty;
+    private string firstName = string.Empty;
+    private string lastName = string.Empty;
+    private string email = string.Empty;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isLoading;
+    private bool isWaitingForConfirmation;
+    private CancellationTokenSource? sseCts;
+    private CustomerReadModel? customer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (State.IsLoggedIn)
+        {
+            await LoadCustomer();
+        }
+    }
+
+    private async Task SignIn()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (!Guid.TryParse(customerIdInput, out var id))
+        {
+            errorMessage = "Please enter a valid GUID.";
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            State.SetCustomer(id);
+            await LoadCustomer();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load customer: {ex.Message}";
+            State.Clear();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Register()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName) || string.IsNullOrWhiteSpace(email))
+        {
+            errorMessage = "All fields are required.";
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            var (id, eventsUrl) = await Api.CreateCustomerAsync(new CreateCustomerCommand(firstName, lastName, email));
+            State.SetCustomer(id);
+
+            // Switch to waiting state
+            isLoading = false;
+            isWaitingForConfirmation = true;
+            StateHasChanged();
+
+            // Wait for SSE confirmation from the projection pipeline
+            sseCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await Api.WaitForCustomerEventAsync(eventsUrl, sseCts.Token);
+
+            isWaitingForConfirmation = false;
+            successMessage = $"Customer created! Your ID: {id}";
+            await LoadCustomer();
+            firstName = string.Empty;
+            lastName = string.Empty;
+            email = string.Empty;
+        }
+        catch (OperationCanceledException)
+        {
+            // SSE timed out — fall back to direct load
+            isWaitingForConfirmation = false;
+            successMessage = $"Customer created! Your ID: {State.CustomerId}";
+            await LoadCustomer();
+            firstName = string.Empty;
+            lastName = string.Empty;
+            email = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            isWaitingForConfirmation = false;
+            errorMessage = $"Registration failed: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            sseCts?.Dispose();
+            sseCts = null;
+        }
+    }
+
+    private async Task LoadCustomer()
+    {
+        customer = await Api.GetCustomerAsync(State.CustomerId!.Value);
+    }
+
+    private void SignOut()
+    {
+        State.Clear();
+        customer = null;
+        errorMessage = null;
+        successMessage = null;
+    }
+}

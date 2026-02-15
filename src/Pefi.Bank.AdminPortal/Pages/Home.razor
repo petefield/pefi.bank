@@ -1,0 +1,66 @@
+@page "/"
+@inject AdminApiClient Api
+
+<PageTitle>Dashboard - Pefi Bank Admin</PageTitle>
+
+<h1 style="margin-bottom: 24px;">Dashboard</h1>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_error is not null)
+{
+    <p style="color: red;">Error: @_error</p>
+}
+else
+{
+    <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+        <div style="background: white; border-radius: 8px; padding: 24px; min-width: 200px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: #777; text-transform: uppercase;">Total Customers</div>
+            <div style="font-size: 2rem; font-weight: 700; margin-top: 8px;">@_customers.Count</div>
+        </div>
+
+        <div style="background: white; border-radius: 8px; padding: 24px; min-width: 200px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: #777; text-transform: uppercase;">Total Accounts</div>
+            <div style="font-size: 2rem; font-weight: 700; margin-top: 8px;">@_customers.Sum(c => c.AccountCount)</div>
+        </div>
+
+        <div style="background: white; border-radius: 8px; padding: 24px; min-width: 200px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: #777; text-transform: uppercase;">Newest Customer</div>
+            <div style="font-size: 1.1rem; font-weight: 600; margin-top: 8px;">
+                @if (_customers.Count > 0)
+                {
+                    var newest = _customers.OrderByDescending(c => c.CreatedAt).First();
+                    @($"{newest.FirstName} {newest.LastName}")
+                }
+                else
+                {
+                    <span>N/A</span>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CustomerReadModel> _customers = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _customers = await Api.GetCustomersAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

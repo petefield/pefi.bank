@@ -1,0 +1,17 @@
+@inherits LayoutComponentBase
+
+<div style="display: flex; flex-direction: column; min-height: 100vh;">
+    <header style="background: #1a5276; color: white; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;">
+        <span style="font-size: 1.25rem; font-weight: 700;">Pefi Bank Admin</span>
+    </header>
+
+    <div style="display: flex; flex: 1;">
+        <nav style="width: 220px; background: #2c3e50; padding: 16px 0; flex-shrink: 0;">
+            <NavMenu />
+        </nav>
+
+        <main style="flex: 1; padding: 24px; overflow-y: auto;">
+            @Body
+        </main>
+    </div>
+</div>

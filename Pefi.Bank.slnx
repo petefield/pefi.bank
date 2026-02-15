@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Pefi.Bank.AdminPortal/Pefi.Bank.AdminPortal.csproj" />
+    <Project Path="src/Pefi.Bank.Api/Pefi.Bank.Api.csproj" />
+    <Project Path="src/Pefi.Bank.CustomerPortal/Pefi.Bank.CustomerPortal.csproj" />
+    <Project Path="src/Pefi.Bank.Domain/Pefi.Bank.Domain.csproj" />
+    <Project Path="src/Pefi.Bank.Functions/Pefi.Bank.Functions.csproj" />
+    <Project Path="src/Pefi.Bank.Infrastructure/Pefi.Bank.Infrastructure.csproj" />
+    <Project Path="src/Pefi.Bank.Shared/Pefi.Bank.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Pefi.Bank.Api.Tests/Pefi.Bank.Api.Tests.csproj" />
+    <Project Path="tests/Pefi.Bank.Domain.Tests/Pefi.Bank.Domain.Tests.csproj" />
+    <Project Path="tests/Pefi.Bank.Infrastructure.Tests/Pefi.Bank.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

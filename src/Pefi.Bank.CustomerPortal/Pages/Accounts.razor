@@ -1,0 +1,159 @@
+@page "/accounts"
+@inject BankApiClient Api
+@inject CustomerState State
+@inject NavigationManager Nav
+
+<h2>Accounts</h2>
+
+@if (!State.IsLoggedIn)
+{
+    <p>Please <a href="">sign in</a> first.</p>
+}
+else
+{
+    <div style="margin-bottom: 20px; padding: 16px; border: 1px solid #dee2e6; border-radius: 6px; max-width: 400px;">
+        <h5>Open New Account</h5>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" @bind="newAccountName" placeholder="Account Name"
+                   style="padding: 6px 10px; flex: 1; border: 1px solid #ccc; border-radius: 4px;" />
+            <button class="btn btn-primary btn-sm" @onclick="OpenAccount" disabled="@isLoading">Open</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div style="margin-bottom: 12px; padding: 10px; background-color: #d1e7dd; color: #0f5132; border-radius: 4px; max-width: 500px;">
+            @message
+        </div>
+    }
+
+    @if (isWaitingForConfirmation)
+    {
+        <div style="margin-bottom: 12px; padding: 12px; border: 1px solid #0d6efd; border-radius: 6px; max-width: 500px; background-color: #cfe2ff;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Processing...</span>
+                </div>
+                <span>Opening your account, please wait...</span>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="margin-bottom: 12px; padding: 10px; background-color: #f8d7da; color: #842029; border-radius: 4px; max-width: 500px;">
+            @errorMessage
+        </div>
+    }
+
+    @if (accounts == null)
+    {
+        <p>Loading accounts...</p>
+    }
+    else if (accounts.Count == 0)
+    {
+        <p>No accounts yet. Open one above.</p>
+    }
+    else
+    {
+        <table style="width: 100%; max-width: 700px; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 2px solid #dee2e6; text-align: left;">
+                    <th style="padding: 8px;">Name</th>
+                    <th style="padding: 8px;">Balance</th>
+                    <th style="padding: 8px;">Status</th>
+                    <th style="padding: 8px;">Opened</th>
+                    <th style="padding: 8px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var acct in accounts)
+                {
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px;">@acct.AccountName</td>
+                        <td style="padding: 8px;">@acct.Balance.ToString("C")</td>
+                        <td style="padding: 8px;">@(acct.IsClosed ? "Closed" : "Active")</td>
+                        <td style="padding: 8px;">@acct.OpenedAt.ToString("yyyy-MM-dd")</td>
+                        <td style="padding: 8px;">
+                            <a href="accounts/@acct.Id" style="text-decoration: none;">View</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private List<AccountReadModel>? accounts;
+    private string newAccountName = string.Empty;
+    private string? message;
+    private string? errorMessage;
+    private bool isLoading;
+    private bool isWaitingForConfirmation;
+    private CancellationTokenSource? sseCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (State.IsLoggedIn)
+        {
+            await LoadAccounts();
+        }
+    }
+
+    private async Task LoadAccounts()
+    {
+        accounts = await Api.GetAccountsAsync(State.CustomerId!.Value);
+    }
+
+    private async Task OpenAccount()
+    {
+        message = null;
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(newAccountName))
+        {
+            errorMessage = "Account name is required.";
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            var (id, eventsUrl) = await Api.OpenAccountAsync(State.CustomerId!.Value, new OpenAccountCommand(newAccountName));
+
+            // Switch to waiting state
+            isLoading = false;
+            isWaitingForConfirmation = true;
+            StateHasChanged();
+
+            // Wait for SSE confirmation from the projection pipeline
+            sseCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await Api.WaitForAccountEventAsync(eventsUrl, sseCts.Token);
+
+            isWaitingForConfirmation = false;
+            message = $"Account opened! ID: {id}";
+            newAccountName = string.Empty;
+            await LoadAccounts();
+        }
+        catch (OperationCanceledException)
+        {
+            // SSE timed out — fall back to direct load
+            isWaitingForConfirmation = false;
+            message = "Account opened!";
+            newAccountName = string.Empty;
+            await LoadAccounts();
+        }
+        catch (Exception ex)
+        {
+            isWaitingForConfirmation = false;
+            errorMessage = $"Failed to open account: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            sseCts?.Dispose();
+            sseCts = null;
+        }
+    }
+}

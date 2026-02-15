@@ -1,0 +1,30 @@
+@inherits LayoutComponentBase
+
+<div style="display: flex; flex-direction: column; min-height: 100vh;">
+    <header style="background-color: #1b6ec2; color: white; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;">
+        <h1 style="margin: 0; font-size: 1.4rem; font-weight: 600;">Pefi Bank</h1>
+        @if (State.IsLoggedIn)
+        {
+            <span style="font-size: 0.85rem; opacity: 0.85;">Customer: @State.CustomerId</span>
+        }
+    </header>
+
+    <div style="display: flex; flex: 1;">
+        <nav style="width: 200px; background-color: #f8f9fa; border-right: 1px solid #dee2e6; padding: 16px 0;">
+            <NavMenu />
+        </nav>
+
+        <main style="flex: 1; padding: 24px;">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    [Inject] private CustomerState State { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        State.OnChange += StateHasChanged;
+    }
+}
