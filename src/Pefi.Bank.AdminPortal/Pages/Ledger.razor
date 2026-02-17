@@ -1,0 +1,134 @@
+@page "/ledger"
+@inject AdminApiClient Api
+
+<PageTitle>Ledger - Pefi Bank Admin</PageTitle>
+
+<h1 style="margin-bottom: 24px;">Ledger</h1>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_error is not null)
+{
+    <p style="color: red;">Error: @_error</p>
+}
+else
+{
+    <div style="margin-bottom: 16px;">
+        <label style="font-size: 0.9rem; color: #555;">Filter by Account ID:</label>
+        <input type="text" @bind="_filterAccountId" @bind:event="oninput"
+               placeholder="Enter account ID to filter..."
+               style="margin-left: 8px; padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; width: 320px;" />
+        <button @onclick="ApplyFilter"
+                style="margin-left: 8px; padding: 6px 16px; background: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Filter
+        </button>
+        @if (_filtered)
+        {
+            <button @onclick="ClearFilter"
+                    style="margin-left: 8px; padding: 6px 16px; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Clear
+            </button>
+        }
+    </div>
+
+    @if (_entries.Count == 0)
+    {
+        <p style="color: #777;">No ledger entries found.</p>
+    }
+    else
+    {
+        <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <thead>
+                <tr style="background: #2c3e50; color: white;">
+                    <th style="padding: 12px 16px; text-align: left;">Date</th>
+                    <th style="padding: 12px 16px; text-align: left;">Transaction Type</th>
+                    <th style="padding: 12px 16px; text-align: left;">Account</th>
+                    <th style="padding: 12px 16px; text-align: left;">Entry Type</th>
+                    <th style="padding: 12px 16px; text-align: right;">Amount</th>
+                    <th style="padding: 12px 16px; text-align: left;">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in _entries)
+                {
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 10px 16px;">@entry.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td style="padding: 10px 16px;">@entry.TransactionType</td>
+                        <td style="padding: 10px 16px; font-family: monospace; font-size: 0.85rem;">@entry.AccountId.ToString()[..8]...</td>
+                        <td style="padding: 10px 16px;">
+                            <span style="padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; background: @(entry.EntryType == "Debit" ? "#fee2e2" : "#dcfce7"); color: @(entry.EntryType == "Debit" ? "#991b1b" : "#166534");">
+                                @entry.EntryType
+                            </span>
+                        </td>
+                        <td style="padding: 10px 16px; text-align: right; font-weight: 600;">@entry.Amount.ToString("C")</td>
+                        <td style="padding: 10px 16px;">@entry.Description</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private List<LedgerEntryReadModel> _entries = [];
+    private bool _loading = true;
+    private string? _error;
+    private string _filterAccountId = string.Empty;
+    private bool _filtered;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEntries();
+    }
+
+    private async Task LoadEntries()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _entries = await Api.GetLedgerEntriesAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ApplyFilter()
+    {
+        if (!Guid.TryParse(_filterAccountId.Trim(), out var accountId))
+            return;
+
+        _loading = true;
+        _error = null;
+        _filtered = true;
+
+        try
+        {
+            _entries = await Api.GetAccountLedgerEntriesAsync(accountId);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ClearFilter()
+    {
+        _filterAccountId = string.Empty;
+        _filtered = false;
+        await LoadEntries();
+    }
+}

@@ -1,30 +1,88 @@
 @inherits LayoutComponentBase
 
-<div style="display: flex; flex-direction: column; min-height: 100vh;">
-    <header style="background-color: #1b6ec2; color: white; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;">
-        <h1 style="margin: 0; font-size: 1.4rem; font-weight: 600;">Pefi Bank</h1>
-        @if (State.IsLoggedIn)
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L3 7v2h18V7L12 2zm0 2.18L17.36 7H6.64L12 4.18zM5 11v6c0 .55.45 1 1 1h3v-8H5zm5 0v8h4v-8h-4zm5 0v8h3c.55 0 1-.45 1-1v-6h-4zM3 20v2h18v-2H3z"/>
+                </svg>
+            </div>
+            <span class="sidebar-brand-text">Pefi Bank</span>
+        </div>
+
+        <NavMenu />
+
+        @if (State.IsLoggedIn && customer != null)
         {
-            <span style="font-size: 0.85rem; opacity: 0.85;">Customer: @State.CustomerId</span>
+            <div class="sidebar-footer">
+                <div class="sidebar-customer">
+                    <div class="sidebar-customer-avatar">
+                        @customer.FirstName[0]@customer.LastName[0]
+                    </div>
+                    <div>
+                        <div class="sidebar-customer-name">@customer.FirstName @customer.LastName</div>
+                        <div class="sidebar-customer-id">@customer.Email</div>
+                    </div>
+                </div>
+            </div>
         }
-    </header>
+    </aside>
 
-    <div style="display: flex; flex: 1;">
-        <nav style="width: 200px; background-color: #f8f9fa; border-right: 1px solid #dee2e6; padding: 16px 0;">
-            <NavMenu />
-        </nav>
-
-        <main style="flex: 1; padding: 24px;">
-            @Body
-        </main>
-    </div>
+    <main class="main-content">
+        @Body
+    </main>
 </div>
 
 @code {
     [Inject] private CustomerState State { get; set; } = default!;
+    [Inject] private BankApiClient Api { get; set; } = default!;
+
+    private CustomerReadModel? customer;
+    private bool hasRestoredAuth;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !hasRestoredAuth)
+        {
+            hasRestoredAuth = true;
+            await State.RestoreAsync();
+            if (State.IsLoggedIn)
+            {
+                await LoadCustomer();
+            }
+            StateHasChanged();
+        }
+    }
 
     protected override void OnInitialized()
     {
-        State.OnChange += StateHasChanged;
+        State.OnChange += OnStateChanged;
+    }
+
+    private async void OnStateChanged()
+    {
+        if (State.IsLoggedIn && customer == null)
+        {
+            await LoadCustomer();
+        }
+        else if (!State.IsLoggedIn)
+        {
+            customer = null;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadCustomer()
+    {
+        try
+        {
+            customer = await Api.GetCustomerAsync(State.CustomerId!.Value);
+        }
+        catch
+        {
+            // Silently ignore — customer may not exist yet (during registration)
+        }
     }
 }

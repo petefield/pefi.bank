@@ -6,6 +6,8 @@ namespace Pefi.Bank.Domain.Aggregates;
 public enum TransferStatus
 {
     Initiated,
+    SourceDebited,
+    DestinationCredited,
     Completed,
     Failed
 }
@@ -37,18 +39,42 @@ public class Transfer : Aggregate
         return transfer;
     }
 
-    public void Complete()
+    public void MarkSourceDebited()
     {
         if (Status != TransferStatus.Initiated)
-            throw new DomainException("Transfer is not in an initiated state.");
+            throw new DomainException("Transfer must be in Initiated state to mark source debited.");
+
+        RaiseEvent(new TransferSourceDebited(Id));
+    }
+
+    public void MarkDestinationCredited()
+    {
+        if (Status != TransferStatus.SourceDebited)
+            throw new DomainException("Transfer must be in SourceDebited state to mark destination credited.");
+
+        RaiseEvent(new TransferDestinationCredited(Id));
+    }
+
+    public void MarkSourceDebitCompensated()
+    {
+        if (Status != TransferStatus.SourceDebited)
+            throw new DomainException("Transfer must be in SourceDebited state to compensate source debit.");
+
+        RaiseEvent(new TransferSourceDebitCompensated(Id));
+    }
+
+    public void Complete()
+    {
+        if (Status != TransferStatus.DestinationCredited)
+            throw new DomainException("Transfer must be in DestinationCredited state to complete.");
 
         RaiseEvent(new TransferCompleted(Id));
     }
 
     public void Fail(string reason)
     {
-        if (Status != TransferStatus.Initiated)
-            throw new DomainException("Transfer is not in an initiated state.");
+        if (Status is not (TransferStatus.Initiated or TransferStatus.SourceDebited))
+            throw new DomainException("Transfer cannot be failed from its current state.");
 
         RaiseEvent(new TransferFailed(Id, reason));
     }
@@ -64,6 +90,18 @@ public class Transfer : Aggregate
                 Amount = e.Amount;
                 Description = e.Description;
                 Status = TransferStatus.Initiated;
+                break;
+
+            case TransferSourceDebited:
+                Status = TransferStatus.SourceDebited;
+                break;
+
+            case TransferDestinationCredited:
+                Status = TransferStatus.DestinationCredited;
+                break;
+
+            case TransferSourceDebitCompensated:
+                // Status stays at SourceDebited — Fail() will be called next
                 break;
 
             case TransferCompleted:

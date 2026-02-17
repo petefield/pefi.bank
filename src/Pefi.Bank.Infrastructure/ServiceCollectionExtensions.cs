@@ -79,6 +79,9 @@ public static class ServiceCollectionExtensions
         await database.Database.CreateContainerIfNotExistsAsync(
             new ContainerProperties("readmodels", "/partitionKey"));
 
+        await database.Database.CreateContainerIfNotExistsAsync(
+            new ContainerProperties("users", "/id"));
+
         // Enable change feed on the events container — inherently supported by CosmosDB
     }
 }

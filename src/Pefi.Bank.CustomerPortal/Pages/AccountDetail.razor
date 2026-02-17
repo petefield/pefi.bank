@@ -2,102 +2,144 @@
 @inject BankApiClient Api
 @inject CustomerState State
 
-<h2>Account Details</h2>
-
 @if (!State.IsLoggedIn)
 {
-    <p>Please <a href="">sign in</a> first.</p>
+    <div class="page-header">
+        <h1 class="page-title">Account Details</h1>
+    </div>
+    <div class="card" style="max-width: 400px;">
+        <div class="empty-state">
+            <div class="empty-state-title">Not signed in</div>
+            <div class="empty-state-text">Please <a href="">sign in</a> to view account details.</div>
+        </div>
+    </div>
 }
 else if (account == null)
 {
-    <p>Loading account...</p>
+    <div class="loading-card">
+        <div class="spinner"></div>
+        <span>Loading account...</span>
+    </div>
 }
 else
 {
-    <div style="margin-bottom: 20px; padding: 16px; border: 1px solid #dee2e6; border-radius: 6px; max-width: 500px;">
-        <h4>@account.AccountName</h4>
-        <p style="font-size: 1.5rem; font-weight: 600; margin: 8px 0;">@account.Balance.ToString("C")</p>
-        <p style="color: #666; margin: 4px 0;">Status: @(account.IsClosed ? "Closed" : "Active")</p>
-        <p style="color: #999; font-size: 0.85rem;">Opened: @account.OpenedAt.ToString("yyyy-MM-dd")</p>
+    <a href="accounts" class="back-link">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+        </svg>
+        Back to Accounts
+    </a>
+
+    @* --- Account Summary Card --- *@
+    <div class="card mb-4" style="max-width: 560px;">
+        <div class="account-card-header">
+            <span class="account-card-name" style="font-size: 1.15rem;">@account.AccountName</span>
+            <span class="account-card-badge @(account.IsClosed ? "badge-closed" : "badge-active")">
+                @(account.IsClosed ? "Closed" : "Active")
+            </span>
+        </div>
+        <div class="account-card-sort-acct mt-2">@account.SortCode &middot; @account.AccountNumber</div>
+        <div class="balance-hero mt-2">@account.Balance.ToString("C")</div>
+        <div class="text-muted mt-2" style="font-size: 0.8rem;">Opened @account.OpenedAt.ToString("dd MMMM yyyy")</div>
     </div>
 
-    <div style="display: flex; gap: 20px; margin-bottom: 24px; flex-wrap: wrap;">
-        <div style="padding: 16px; border: 1px solid #dee2e6; border-radius: 6px; min-width: 250px;">
-            <h5>Deposit</h5>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-                <input type="number" step="0.01" min="0.01" @bind="depositAmount" placeholder="Amount"
-                       style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
-                <input type="text" @bind="depositDescription" placeholder="Description"
-                       style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
-                <button class="btn btn-success btn-sm" @onclick="Deposit" disabled="@isLoading">Deposit</button>
+    @* --- Deposit & Withdraw Panels --- *@
+    <div class="action-panels">
+        <div class="card card-flat" style="border: 1px solid var(--card-border);">
+            <div class="action-panel-header">
+                <div class="action-panel-icon" style="background: var(--green-bg);">
+                    <svg viewBox="0 0 24 24" fill="var(--green)" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/>
+                    </svg>
+                </div>
+                <span class="action-panel-title">Deposit</span>
             </div>
+            <div class="form-group">
+                <label class="form-label">Amount</label>
+                <input type="number" step="0.01" min="0.01" class="form-input" @bind="depositAmount" placeholder="0.00" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" class="form-input" @bind="depositDescription" placeholder="e.g. Salary" />
+            </div>
+            <button class="btn btn-success btn-full" @onclick="Deposit" disabled="@isLoading">Deposit</button>
         </div>
 
-        <div style="padding: 16px; border: 1px solid #dee2e6; border-radius: 6px; min-width: 250px;">
-            <h5>Withdraw</h5>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-                <input type="number" step="0.01" min="0.01" @bind="withdrawAmount" placeholder="Amount"
-                       style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
-                <input type="text" @bind="withdrawDescription" placeholder="Description"
-                       style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
-                <button class="btn btn-warning btn-sm" @onclick="Withdraw" disabled="@isLoading">Withdraw</button>
+        <div class="card card-flat" style="border: 1px solid var(--card-border);">
+            <div class="action-panel-header">
+                <div class="action-panel-icon" style="background: var(--amber-bg);">
+                    <svg viewBox="0 0 24 24" fill="var(--amber)" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8z"/>
+                    </svg>
+                </div>
+                <span class="action-panel-title">Withdraw</span>
             </div>
+            <div class="form-group">
+                <label class="form-label">Amount</label>
+                <input type="number" step="0.01" min="0.01" class="form-input" @bind="withdrawAmount" placeholder="0.00" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" class="form-input" @bind="withdrawDescription" placeholder="e.g. Rent payment" />
+            </div>
+            <button class="btn btn-warning btn-full" @onclick="Withdraw" disabled="@isLoading">Withdraw</button>
         </div>
     </div>
 
     @if (!string.IsNullOrEmpty(message))
     {
-        <div style="margin-bottom: 12px; padding: 10px; background-color: #d1e7dd; color: #0f5132; border-radius: 4px; max-width: 500px;">
-            @message
-        </div>
+        <div class="alert alert-success">@message</div>
     }
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div style="margin-bottom: 12px; padding: 10px; background-color: #f8d7da; color: #842029; border-radius: 4px; max-width: 500px;">
-            @errorMessage
+        <div class="alert alert-error">@errorMessage</div>
+    }
+
+    @* --- Transaction History --- *@
+    <div class="card">
+        <div class="section-header">
+            <h3 class="section-title">Transaction History</h3>
         </div>
-    }
 
-    <h4>Transaction History</h4>
-
-    @if (transactions == null)
-    {
-        <p>Loading transactions...</p>
-    }
-    else if (transactions.Count == 0)
-    {
-        <p>No transactions yet.</p>
-    }
-    else
-    {
-        <table style="width: 100%; max-width: 800px; border-collapse: collapse;">
-            <thead>
-                <tr style="border-bottom: 2px solid #dee2e6; text-align: left;">
-                    <th style="padding: 8px;">Date</th>
-                    <th style="padding: 8px;">Type</th>
-                    <th style="padding: 8px;">Amount</th>
-                    <th style="padding: 8px;">Description</th>
-                    <th style="padding: 8px;">Balance After</th>
-                </tr>
-            </thead>
-            <tbody>
+        @if (transactions == null)
+        {
+            <div class="loading-card">
+                <div class="spinner"></div>
+                <span>Loading transactions...</span>
+            </div>
+        }
+        else if (transactions.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-state-title">No transactions yet</div>
+                <div class="empty-state-text">Make a deposit or withdrawal to see your history here.</div>
+            </div>
+        }
+        else
+        {
+            <div class="tx-list">
                 @foreach (var tx in transactions)
                 {
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 8px;">@tx.OccurredAt.ToString("yyyy-MM-dd HH:mm")</td>
-                        <td style="padding: 8px;">@tx.Type</td>
-                        <td style="padding: 8px;">@tx.Amount.ToString("C")</td>
-                        <td style="padding: 8px;">@tx.Description</td>
-                        <td style="padding: 8px;">@tx.BalanceAfter.ToString("C")</td>
-                    </tr>
+                    <div class="tx-item">
+                        <div class="tx-icon @GetTxIconClass(tx.Type)">
+                            @((MarkupString)GetTxIconSvg(tx.Type))
+                        </div>
+                        <div class="tx-details">
+                            <div class="tx-type">@tx.Type</div>
+                            <div class="tx-description">@(string.IsNullOrEmpty(tx.Description) ? "No description" : tx.Description)</div>
+                            <div class="tx-date">@tx.OccurredAt.ToString("dd MMM yyyy, HH:mm")</div>
+                        </div>
+                        <div class="tx-amounts">
+                            <div class="tx-amount @GetTxAmountClass(tx.Type)">
+                                @GetTxAmountPrefix(tx.Type)@tx.Amount.ToString("C")
+                            </div>
+                            <div class="tx-balance-after">Bal: @tx.BalanceAfter.ToString("C")</div>
+                        </div>
+                    </div>
                 }
-            </tbody>
-        </table>
-    }
-
-    <div style="margin-top: 16px;">
-        <a href="accounts">Back to Accounts</a>
+            </div>
+        }
     </div>
 }
 
@@ -190,4 +232,32 @@ else
             isLoading = false;
         }
     }
+
+    private static string GetTxIconClass(string type) => type switch
+    {
+        "Deposit" => "tx-icon-deposit",
+        "Withdrawal" => "tx-icon-withdrawal",
+        _ => "tx-icon-transfer"
+    };
+
+    private static string GetTxIconSvg(string type) => type switch
+    {
+        "Deposit" => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>""",
+        "Withdrawal" => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8z"/></svg>""",
+        _ => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>"""
+    };
+
+    private static string GetTxAmountClass(string type) => type switch
+    {
+        "Deposit" => "tx-amount-positive",
+        "Withdrawal" => "tx-amount-negative",
+        _ => "tx-amount-neutral"
+    };
+
+    private static string GetTxAmountPrefix(string type) => type switch
+    {
+        "Deposit" => "+",
+        "Withdrawal" => "-",
+        _ => ""
+    };
 }

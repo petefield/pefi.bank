@@ -41,10 +41,29 @@ else
             </div>
         </div>
     </div>
+
+    <h2 style="margin-top: 32px; margin-bottom: 16px;">Settlement Account</h2>
+    <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+        <div style="background: white; border-radius: 8px; padding: 24px; min-width: 200px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: #777; text-transform: uppercase;">Balance</div>
+            <div style="font-size: 2rem; font-weight: 700; margin-top: 8px;">@(_settlement?.Balance.ToString("C") ?? "N/A")</div>
+        </div>
+
+        <div style="background: white; border-radius: 8px; padding: 24px; min-width: 200px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: #777; text-transform: uppercase;">Total Debits</div>
+            <div style="font-size: 1.5rem; font-weight: 600; margin-top: 8px;">@(_settlement?.TotalDebits.ToString("C") ?? "N/A")</div>
+        </div>
+
+        <div style="background: white; border-radius: 8px; padding: 24px; min-width: 200px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: #777; text-transform: uppercase;">Total Credits</div>
+            <div style="font-size: 1.5rem; font-weight: 600; margin-top: 8px;">@(_settlement?.TotalCredits.ToString("C") ?? "N/A")</div>
+        </div>
+    </div>
 }
 
 @code {
     private List<CustomerReadModel> _customers = [];
+    private SettlementAccountReadModel? _settlement;
     private bool _loading = true;
     private string? _error;
 
@@ -53,6 +72,7 @@ else
         try
         {
             _customers = await Api.GetCustomersAsync();
+            _settlement = await Api.GetSettlementAccountAsync();
         }
         catch (Exception ex)
         {

@@ -2,89 +2,130 @@
 @inject BankApiClient Api
 @inject CustomerState State
 
-<h2>Welcome to Pefi Bank</h2>
-
 @if (!State.IsLoggedIn)
 {
-    <div style="margin-top: 20px;">
-        <h4>Sign In</h4>
-        <p>Enter your Customer ID to continue:</p>
-        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
-            <input type="text" @bind="customerIdInput" placeholder="Customer ID (Guid)" 
-                   style="padding: 6px 10px; width: 340px; border: 1px solid #ccc; border-radius: 4px;" />
-            <button class="btn btn-primary btn-sm" @onclick="SignIn">Sign In</button>
-        </div>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="auth-brand-icon">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L3 7v2h18V7L12 2zm0 2.18L17.36 7H6.64L12 4.18zM5 11v6c0 .55.45 1 1 1h3v-8H5zm5 0v8h4v-8h-4zm5 0v8h3c.55 0 1-.45 1-1v-6h-4zM3 20v2h18v-2H3z"/>
+                    </svg>
+                </div>
+                <div class="auth-brand-title">Welcome to Pefi Bank</div>
+                <div class="auth-brand-subtitle">Your modern banking experience</div>
+            </div>
 
-        <hr />
+            <div class="card">
+                <h4 class="section-title mb-3">Sign In</h4>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" @bind="loginEmail" placeholder="you@example.com" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" @bind="loginPassword" placeholder="Enter your password" />
+                </div>
+                <button class="btn btn-primary btn-full" @onclick="SignIn" disabled="@isLoading">
+                    @(isLoading ? "Signing in..." : "Sign In")
+                </button>
+            </div>
 
-        <h4>Register New Customer</h4>
-        <div style="display: flex; flex-direction: column; gap: 8px; max-width: 340px;">
-            <input type="text" @bind="firstName" placeholder="First Name"
-                   style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
-            <input type="text" @bind="lastName" placeholder="Last Name"
-                   style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
-            <input type="email" @bind="email" placeholder="Email"
-                   style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
-            <button class="btn btn-primary btn-sm" @onclick="Register" disabled="@(isLoading || isWaitingForConfirmation)">
-                @(isLoading ? "Creating..." : "Register")
-            </button>
+            <div class="auth-divider">or</div>
+
+            <div class="card">
+                <h4 class="section-title mb-3">Create Account</h4>
+                <div class="form-group">
+                    <label class="form-label">First Name</label>
+                    <input type="text" class="form-input" @bind="firstName" placeholder="Enter your first name" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Last Name</label>
+                    <input type="text" class="form-input" @bind="lastName" placeholder="Enter your last name" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" @bind="registerEmail" placeholder="you@example.com" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" @bind="registerPassword" placeholder="At least 6 characters" />
+                </div>
+                <button class="btn btn-primary btn-full" @onclick="Register" disabled="@isLoading">
+                    @(isLoading ? "Creating..." : "Register")
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error mt-3">@errorMessage</div>
+            }
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success mt-3">@successMessage</div>
+            }
         </div>
     </div>
 }
 else
 {
+    <div class="page-header">
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Welcome back@(customer != null ? $", {customer.FirstName}" : "")</p>
+    </div>
+
     @if (customer != null)
     {
-        <div style="margin-top: 16px; padding: 16px; border: 1px solid #dee2e6; border-radius: 6px; max-width: 500px;">
-            <h4>@customer.FirstName @customer.LastName</h4>
-            <p style="margin: 4px 0; color: #666;">@customer.Email</p>
-            <p style="margin: 4px 0;">Accounts: @customer.AccountCount</p>
-            <p style="margin: 4px 0; font-size: 0.85rem; color: #999;">Member since @customer.CreatedAt.ToString("yyyy-MM-dd")</p>
+        <div class="card mb-4" style="max-width: 560px;">
+            <div class="profile-card">
+                <div class="profile-avatar">
+                    @customer.FirstName[0]@customer.LastName[0]
+                </div>
+                <div class="profile-info">
+                    <div class="profile-name">@customer.FirstName @customer.LastName</div>
+                    <div class="profile-email">@customer.Email</div>
+                    <div class="profile-meta">Member since @customer.CreatedAt.ToString("MMMM yyyy")</div>
+                </div>
+            </div>
+
+            <div class="stat-row">
+                <div class="stat-chip">
+                    <div class="stat-chip-value">@customer.AccountCount</div>
+                    <div class="stat-chip-label">Accounts</div>
+                </div>
+                <div class="stat-chip">
+                    <div class="stat-chip-value">@customer.CreatedAt.ToString("dd MMM yyyy")</div>
+                    <div class="stat-chip-label">Joined</div>
+                </div>
+            </div>
         </div>
-        <button class="btn btn-outline-secondary btn-sm" style="margin-top: 12px;" @onclick="SignOut">Sign Out</button>
+
+        <div class="actions-row">
+            <a href="accounts" class="btn btn-primary">View Accounts</a>
+            <a href="transfer" class="btn btn-outline">Make Transfer</a>
+            <button class="btn btn-outline" @onclick="SignOut">Sign Out</button>
+        </div>
     }
     else if (isLoading)
     {
-        <p>Loading customer details...</p>
+        <div class="loading-card">
+            <div class="spinner"></div>
+            <span>Loading your profile...</span>
+        </div>
     }
 }
 
-@if (isWaitingForConfirmation)
-{
-    <div style="margin-top: 16px; padding: 16px; border: 1px solid #0d6efd; border-radius: 6px; max-width: 400px; background-color: #cfe2ff;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="spinner-border spinner-border-sm text-primary" role="status">
-                <span class="visually-hidden">Processing...</span>
-            </div>
-            <span>Setting up your account, please wait...</span>
-        </div>
-    </div>
-}
-
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div style="margin-top: 12px; padding: 10px; background-color: #f8d7da; color: #842029; border-radius: 4px;">
-        @errorMessage
-    </div>
-}
-
-@if (!string.IsNullOrEmpty(successMessage))
-{
-    <div style="margin-top: 12px; padding: 10px; background-color: #d1e7dd; color: #0f5132; border-radius: 4px;">
-        @successMessage
-    </div>
-}
-
 @code {
-    private string customerIdInput = string.Empty;
+    private string loginEmail = string.Empty;
+    private string loginPassword = string.Empty;
     private string firstName = string.Empty;
     private string lastName = string.Empty;
-    private string email = string.Empty;
+    private string registerEmail = string.Empty;
+    private string registerPassword = string.Empty;
     private string? errorMessage;
     private string? successMessage;
     private bool isLoading;
-    private bool isWaitingForConfirmation;
-    private CancellationTokenSource? sseCts;
     private CustomerReadModel? customer;
 
     protected override async Task OnInitializedAsync()
@@ -100,22 +141,28 @@ else
         errorMessage = null;
         successMessage = null;
 
-        if (!Guid.TryParse(customerIdInput, out var id))
+        if (string.IsNullOrWhiteSpace(loginEmail) || string.IsNullOrWhiteSpace(loginPassword))
         {
-            errorMessage = "Please enter a valid GUID.";
+            errorMessage = "Email and password are required.";
             return;
         }
 
         isLoading = true;
         try
         {
-            State.SetCustomer(id);
+            var result = await Api.LoginAsync(new Pefi.Bank.Shared.Commands.LoginCommand(loginEmail, loginPassword));
+            if (result is null)
+            {
+                errorMessage = "Invalid email or password.";
+                return;
+            }
+
+            State.SetAuth(result.CustomerId, result.Token, result.Email);
             await LoadCustomer();
         }
         catch (Exception ex)
         {
-            errorMessage = $"Failed to load customer: {ex.Message}";
-            State.Clear();
+            errorMessage = $"Sign in failed: {ex.Message}";
         }
         finally
         {
@@ -128,7 +175,8 @@ else
         errorMessage = null;
         successMessage = null;
 
-        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName) || string.IsNullOrWhiteSpace(email))
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName) ||
+            string.IsNullOrWhiteSpace(registerEmail) || string.IsNullOrWhiteSpace(registerPassword))
         {
             errorMessage = "All fields are required.";
             return;
@@ -137,51 +185,37 @@ else
         isLoading = true;
         try
         {
-            var (id, eventsUrl) = await Api.CreateCustomerAsync(new CreateCustomerCommand(firstName, lastName, email));
-            State.SetCustomer(id);
+            var result = await Api.RegisterAsync(
+                new Pefi.Bank.Shared.Commands.RegisterCommand(firstName, lastName, registerEmail, registerPassword));
 
-            // Switch to waiting state
-            isLoading = false;
-            isWaitingForConfirmation = true;
-            StateHasChanged();
-
-            // Wait for SSE confirmation from the projection pipeline
-            sseCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            await Api.WaitForCustomerEventAsync(eventsUrl, sseCts.Token);
-
-            isWaitingForConfirmation = false;
-            successMessage = $"Customer created! Your ID: {id}";
-            await LoadCustomer();
+            State.SetAuth(result.CustomerId, result.Token, result.Email);
+            successMessage = "Account created successfully!";
             firstName = string.Empty;
             lastName = string.Empty;
-            email = string.Empty;
-        }
-        catch (OperationCanceledException)
-        {
-            // SSE timed out — fall back to direct load
-            isWaitingForConfirmation = false;
-            successMessage = $"Customer created! Your ID: {State.CustomerId}";
+            registerEmail = string.Empty;
+            registerPassword = string.Empty;
             await LoadCustomer();
-            firstName = string.Empty;
-            lastName = string.Empty;
-            email = string.Empty;
         }
         catch (Exception ex)
         {
-            isWaitingForConfirmation = false;
             errorMessage = $"Registration failed: {ex.Message}";
         }
         finally
         {
             isLoading = false;
-            sseCts?.Dispose();
-            sseCts = null;
         }
     }
 
     private async Task LoadCustomer()
     {
-        customer = await Api.GetCustomerAsync(State.CustomerId!.Value);
+        try
+        {
+            customer = await Api.GetCustomerAsync(State.CustomerId!.Value);
+        }
+        catch
+        {
+            // Customer projection may not be ready yet — show dashboard without profile
+        }
     }
 
     private void SignOut()

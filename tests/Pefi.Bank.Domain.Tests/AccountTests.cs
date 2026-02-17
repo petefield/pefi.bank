@@ -13,6 +13,8 @@ public class AccountTests
         Assert.Equal(0, account.Balance);
         Assert.False(account.IsClosed);
         Assert.Equal("Checking", account.AccountName);
+        Assert.Equal(8, account.AccountNumber.Length);
+        Assert.Equal("04-00-75", account.SortCode);
         Assert.Single(account.UncommittedEvents);
     }
 

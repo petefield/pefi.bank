@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Pefi.Bank.Auth\Pefi.Bank.Auth.csproj" />
     <ProjectReference Include="..\Pefi.Bank.Domain\Pefi.Bank.Domain.csproj" />
     <ProjectReference Include="..\Pefi.Bank.Infrastructure\Pefi.Bank.Infrastructure.csproj" />
     <ProjectReference Include="..\Pefi.Bank.Shared\Pefi.Bank.Shared.csproj" />

@@ -3,84 +3,100 @@
 @inject CustomerState State
 @inject NavigationManager Nav
 
-<h2>Accounts</h2>
-
 @if (!State.IsLoggedIn)
 {
-    <p>Please <a href="">sign in</a> first.</p>
+    <div class="page-header">
+        <h1 class="page-title">Accounts</h1>
+    </div>
+    <div class="card" style="max-width: 400px;">
+        <div class="empty-state">
+            <div class="empty-state-title">Not signed in</div>
+            <div class="empty-state-text">Please <a href="">sign in</a> to view your accounts.</div>
+        </div>
+    </div>
 }
 else
 {
-    <div style="margin-bottom: 20px; padding: 16px; border: 1px solid #dee2e6; border-radius: 6px; max-width: 400px;">
-        <h5>Open New Account</h5>
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="text" @bind="newAccountName" placeholder="Account Name"
-                   style="padding: 6px 10px; flex: 1; border: 1px solid #ccc; border-radius: 4px;" />
-            <button class="btn btn-primary btn-sm" @onclick="OpenAccount" disabled="@isLoading">Open</button>
+    <div class="page-header">
+        <h1 class="page-title">Accounts</h1>
+        <p class="page-subtitle">Manage your bank accounts</p>
+    </div>
+
+    <div class="card mb-4" style="max-width: 480px;">
+        <div class="section-header">
+            <h3 class="section-title">Open New Account</h3>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: flex-end;">
+            <div style="flex: 1;">
+                <label class="form-label">Account Name</label>
+                <input type="text" class="form-input" @bind="newAccountName" placeholder="e.g. Savings, Bills" />
+            </div>
+            <button class="btn btn-primary" @onclick="OpenAccount" disabled="@isLoading" style="height: 42px;">
+                Open
+            </button>
         </div>
     </div>
 
     @if (!string.IsNullOrEmpty(message))
     {
-        <div style="margin-bottom: 12px; padding: 10px; background-color: #d1e7dd; color: #0f5132; border-radius: 4px; max-width: 500px;">
-            @message
-        </div>
+        <div class="alert alert-success" style="max-width: 480px;">@message</div>
     }
 
     @if (isWaitingForConfirmation)
     {
-        <div style="margin-bottom: 12px; padding: 12px; border: 1px solid #0d6efd; border-radius: 6px; max-width: 500px; background-color: #cfe2ff;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <div class="spinner-border spinner-border-sm text-primary" role="status">
-                    <span class="visually-hidden">Processing...</span>
-                </div>
-                <span>Opening your account, please wait...</span>
-            </div>
+        <div class="waiting-banner" style="max-width: 480px;">
+            <div class="spinner"></div>
+            <span>Opening your account, please wait...</span>
         </div>
     }
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div style="margin-bottom: 12px; padding: 10px; background-color: #f8d7da; color: #842029; border-radius: 4px; max-width: 500px;">
-            @errorMessage
-        </div>
+        <div class="alert alert-error" style="max-width: 480px;">@errorMessage</div>
     }
 
     @if (accounts == null)
     {
-        <p>Loading accounts...</p>
+        <div class="loading-card">
+            <div class="spinner"></div>
+            <span>Loading accounts...</span>
+        </div>
     }
     else if (accounts.Count == 0)
     {
-        <p>No accounts yet. Open one above.</p>
+        <div class="card">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1H12c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                </svg>
+                <div class="empty-state-title">No accounts yet</div>
+                <div class="empty-state-text">Open your first account above to get started.</div>
+            </div>
+        </div>
     }
     else
     {
-        <table style="width: 100%; max-width: 700px; border-collapse: collapse;">
-            <thead>
-                <tr style="border-bottom: 2px solid #dee2e6; text-align: left;">
-                    <th style="padding: 8px;">Name</th>
-                    <th style="padding: 8px;">Balance</th>
-                    <th style="padding: 8px;">Status</th>
-                    <th style="padding: 8px;">Opened</th>
-                    <th style="padding: 8px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var acct in accounts)
-                {
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 8px;">@acct.AccountName</td>
-                        <td style="padding: 8px;">@acct.Balance.ToString("C")</td>
-                        <td style="padding: 8px;">@(acct.IsClosed ? "Closed" : "Active")</td>
-                        <td style="padding: 8px;">@acct.OpenedAt.ToString("yyyy-MM-dd")</td>
-                        <td style="padding: 8px;">
-                            <a href="accounts/@acct.Id" style="text-decoration: none;">View</a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+        <div class="account-grid">
+            @foreach (var acct in accounts)
+            {
+                <a href="accounts/@acct.Id" class="account-card">
+                    <div class="account-card-header">
+                        <span class="account-card-name">@acct.AccountName</span>
+                        <span class="account-card-badge @(acct.IsClosed ? "badge-closed" : "badge-active")">
+                            @(acct.IsClosed ? "Closed" : "Active")
+                        </span>
+                    </div>
+                    <div class="account-card-sort-acct">
+                        @acct.SortCode &middot; @acct.AccountNumber
+                    </div>
+                    <div class="account-card-balance">@acct.Balance.ToString("C")</div>
+                    <div class="account-card-footer">
+                        <span>Opened @acct.OpenedAt.ToString("dd MMM yyyy")</span>
+                        <span>View &rarr;</span>
+                    </div>
+                </a>
+            }
+        </div>
     }
 }
 
@@ -120,14 +136,12 @@ else
         isLoading = true;
         try
         {
-            var (id, eventsUrl) = await Api.OpenAccountAsync(State.CustomerId!.Value, new OpenAccountCommand(newAccountName));
+            var (id, eventsUrl) = await Api.OpenAccountAsync(new OpenAccountCommand(newAccountName));
 
-            // Switch to waiting state
             isLoading = false;
             isWaitingForConfirmation = true;
             StateHasChanged();
 
-            // Wait for SSE confirmation from the projection pipeline
             sseCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             await Api.WaitForAccountEventAsync(eventsUrl, sseCts.Token);
 
@@ -138,7 +152,6 @@ else
         }
         catch (OperationCanceledException)
         {
-            // SSE timed out — fall back to direct load
             isWaitingForConfirmation = false;
             message = "Account opened!";
             newAccountName = string.Empty;

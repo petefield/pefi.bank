@@ -23,6 +23,12 @@ public sealed class AdminApiClient
         return await _http.GetFromJsonAsync<CustomerReadModel>($"customers/{id}");
     }
 
+    public async Task<List<AccountReadModel>> GetAccountsAsync()
+    {
+        return await _http.GetFromJsonAsync<List<AccountReadModel>>("accounts")
+               ?? [];
+    }
+
     public async Task<List<AccountReadModel>> GetCustomerAccountsAsync(Guid customerId)
     {
         return await _http.GetFromJsonAsync<List<AccountReadModel>>($"customers/{customerId}/accounts")
@@ -38,5 +44,22 @@ public sealed class AdminApiClient
     {
         return await _http.GetFromJsonAsync<List<TransactionReadModel>>($"accounts/{accountId}/transactions")
                ?? [];
+    }
+
+    public async Task<List<LedgerEntryReadModel>> GetLedgerEntriesAsync()
+    {
+        return await _http.GetFromJsonAsync<List<LedgerEntryReadModel>>("ledger")
+               ?? [];
+    }
+
+    public async Task<List<LedgerEntryReadModel>> GetAccountLedgerEntriesAsync(Guid accountId)
+    {
+        return await _http.GetFromJsonAsync<List<LedgerEntryReadModel>>($"ledger?accountId={accountId}")
+               ?? [];
+    }
+
+    public async Task<SettlementAccountReadModel?> GetSettlementAccountAsync()
+    {
+        return await _http.GetFromJsonAsync<SettlementAccountReadModel>("settlement");
     }
 }

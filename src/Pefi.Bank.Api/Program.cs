@@ -1,5 +1,6 @@
 using Pefi.Bank.Api;
 using Pefi.Bank.Api.Endpoints;
+using Pefi.Bank.Auth;
 using Pefi.Bank.Infrastructure;
 using StackExchange.Redis;
 
@@ -16,6 +17,18 @@ builder.Services.AddCosmosInfrastructure(cosmosConnection, databaseName);
 var redisConnection = builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "localhost:6379";
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     ConnectionMultiplexer.Connect(redisConnection));
+
+// JWT Authentication
+var jwtSettings = new JwtSettings
+{
+    Secret = builder.Configuration.GetValue<string>("Jwt:Secret")
+        ?? "PefiBankDevelopmentSecretKey_MustBeAtLeast32BytesLong!",
+    Issuer = builder.Configuration.GetValue<string>("Jwt:Issuer") ?? "PefiBank",
+    Audience = builder.Configuration.GetValue<string>("Jwt:Audience") ?? "PefiBankCustomers",
+    ExpiryMinutes = builder.Configuration.GetValue<int?>("Jwt:ExpiryMinutes") ?? 480
+};
+
+builder.Services.AddPefiAuthentication(jwtSettings, cosmosConnection, databaseName);
 
 builder.Services.AddCors(options =>
 {
@@ -34,14 +47,18 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Initialize CosmosDB containers
 await app.Services.InitializeCosmosAsync(databaseName);
 
 // Map endpoints
+app.MapAuthEndpoints();
 app.MapCustomerEndpoints();
 app.MapAccountEndpoints();
 app.MapTransferEndpoints();
+app.MapLedgerEndpoints();
 
 app.Run();
 

@@ -1,0 +1,77 @@
+@page "/accounts"
+@inject AdminApiClient Api
+
+<PageTitle>Accounts - Pefi Bank Admin</PageTitle>
+
+<h1 style="margin-bottom: 24px;">Accounts</h1>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_error is not null)
+{
+    <p style="color: red;">Error: @_error</p>
+}
+else if (_accounts.Count == 0)
+{
+    <p>No accounts found.</p>
+}
+else
+{
+    <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Sort Code</th>
+                    <th>Account No.</th>
+                    <th>Account Name</th>
+                    <th>Customer</th>
+                    <th>Balance</th>
+                    <th>Status</th>
+                    <th>Opened</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var account in _accounts)
+                {
+                    <tr>
+                        <td>@account.SortCode</td>
+                        <td>@account.AccountNumber</td>
+                        <td>@account.AccountName</td>
+                        <td><a href="customers/@account.CustomerId" style="text-decoration: none;">@account.CustomerId.ToString()[..8]...</a></td>
+                        <td>@account.Balance.ToString("C")</td>
+                        <td>@(account.IsClosed ? "Closed" : "Active")</td>
+                        <td>@account.OpenedAt.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            <a href="accounts/@account.Id" style="text-decoration: none;">View</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<AccountReadModel> _accounts = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _accounts = await Api.GetAccountsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

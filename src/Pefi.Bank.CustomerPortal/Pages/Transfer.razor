@@ -2,76 +2,104 @@
 @inject BankApiClient Api
 @inject CustomerState State
 
-<h2>Transfer Funds</h2>
-
 @if (!State.IsLoggedIn)
 {
-    <p>Please <a href="">sign in</a> first.</p>
+    <div class="page-header">
+        <h1 class="page-title">Transfer</h1>
+    </div>
+    <div class="card" style="max-width: 400px;">
+        <div class="empty-state">
+            <div class="empty-state-title">Not signed in</div>
+            <div class="empty-state-text">Please <a href="">sign in</a> to make transfers.</div>
+        </div>
+    </div>
 }
 else if (accounts == null)
 {
-    <p>Loading accounts...</p>
+    <div class="page-header">
+        <h1 class="page-title">Transfer</h1>
+        <p class="page-subtitle">Move money between your accounts</p>
+    </div>
+    <div class="loading-card">
+        <div class="spinner"></div>
+        <span>Loading accounts...</span>
+    </div>
 }
 else if (accounts.Count < 2)
 {
-    <p>You need at least two accounts to make a transfer. <a href="accounts">Open an account</a>.</p>
+    <div class="page-header">
+        <h1 class="page-title">Transfer</h1>
+        <p class="page-subtitle">Move money between your accounts</p>
+    </div>
+    <div class="card" style="max-width: 480px;">
+        <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/>
+            </svg>
+            <div class="empty-state-title">Need more accounts</div>
+            <div class="empty-state-text">You need at least two accounts to make a transfer. <a href="accounts">Open an account</a>.</div>
+        </div>
+    </div>
 }
 else
 {
-    <div style="padding: 16px; border: 1px solid #dee2e6; border-radius: 6px; max-width: 450px;">
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-            <div>
-                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Source Account</label>
-                <select @bind="sourceAccountId" style="width: 100%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;">
-                    <option value="">-- Select source --</option>
-                    @foreach (var acct in accounts.Where(a => !a.IsClosed))
-                    {
-                        <option value="@acct.Id">@acct.AccountName (@acct.Balance.ToString("C"))</option>
-                    }
-                </select>
-            </div>
+    <div class="page-header">
+        <h1 class="page-title">Transfer</h1>
+        <p class="page-subtitle">Move money between your accounts</p>
+    </div>
 
-            <div>
-                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Destination Account</label>
-                <select @bind="destinationAccountId" style="width: 100%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;">
-                    <option value="">-- Select destination --</option>
-                    @foreach (var acct in accounts.Where(a => !a.IsClosed))
-                    {
-                        <option value="@acct.Id">@acct.AccountName (@acct.Balance.ToString("C"))</option>
-                    }
-                </select>
-            </div>
-
-            <div>
-                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Amount</label>
-                <input type="number" step="0.01" min="0.01" @bind="amount"
-                       style="width: 100%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
-            </div>
-
-            <div>
-                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
-                <input type="text" @bind="description" placeholder="Optional description"
-                       style="width: 100%; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px;" />
-            </div>
-
-            <button class="btn btn-primary" @onclick="SubmitTransfer" disabled="@isLoading">
-                @(isLoading ? "Processing..." : "Transfer")
-            </button>
+    <div class="card" style="max-width: 480px;">
+        <div class="form-group">
+            <label class="form-label">From Account</label>
+            <select class="form-select" @bind="sourceAccountId">
+                <option value="">Select source account</option>
+                @foreach (var acct in accounts.Where(a => !a.IsClosed))
+                {
+                    <option value="@acct.Id">@acct.AccountName &middot; @acct.AccountNumber (@acct.Balance.ToString("C"))</option>
+                }
+            </select>
         </div>
+
+        <div class="transfer-arrow">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(90 12 12)"/>
+            </svg>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">To Account</label>
+            <select class="form-select" @bind="destinationAccountId">
+                <option value="">Select destination account</option>
+                @foreach (var acct in accounts.Where(a => !a.IsClosed))
+                {
+                    <option value="@acct.Id">@acct.AccountName &middot; @acct.AccountNumber (@acct.Balance.ToString("C"))</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group mt-3">
+            <label class="form-label">Amount</label>
+            <input type="number" step="0.01" min="0.01" class="form-input" @bind="amount" placeholder="0.00" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Description (optional)</label>
+            <input type="text" class="form-input" @bind="description" placeholder="What's this transfer for?" />
+        </div>
+
+        <button class="btn btn-primary btn-full mt-3" @onclick="SubmitTransfer" disabled="@isLoading">
+            @(isLoading ? "Processing..." : "Transfer")
+        </button>
     </div>
 
     @if (!string.IsNullOrEmpty(message))
     {
-        <div style="margin-top: 12px; padding: 10px; background-color: #d1e7dd; color: #0f5132; border-radius: 4px; max-width: 450px;">
-            @message
-        </div>
+        <div class="alert alert-success mt-3" style="max-width: 480px;">@message</div>
     }
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div style="margin-top: 12px; padding: 10px; background-color: #f8d7da; color: #842029; border-radius: 4px; max-width: 450px;">
-            @errorMessage
-        </div>
+        <div class="alert alert-error mt-3" style="max-width: 480px;">@errorMessage</div>
     }
 }
 

@@ -6,6 +6,8 @@ public sealed class AccountReadModel
     public string PartitionKey { get; set; } = "account";
     public Guid CustomerId { get; set; }
     public string AccountName { get; set; } = string.Empty;
+    public string AccountNumber { get; set; } = string.Empty;
+    public string SortCode { get; set; } = string.Empty;
     public decimal Balance { get; set; }
     public bool IsClosed { get; set; }
     public DateTime OpenedAt { get; set; }

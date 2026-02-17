@@ -14,29 +14,23 @@ public class BankApiClient
         _http = http;
     }
 
-    // Customers
-    public async Task<(Guid Id, string EventsUrl)> CreateCustomerAsync(CreateCustomerCommand command)
+    // Auth
+    public async Task<AuthResponse> RegisterAsync(RegisterCommand command)
     {
-        var response = await _http.PostAsJsonAsync("customers", command);
+        var response = await _http.PostAsJsonAsync("auth/register", command);
         response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<CustomerCreatedResponse>();
-        return (result!.Id, result.EventsUrl);
+        return (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
     }
 
-    public async Task<string?> WaitForCustomerEventAsync(string eventsUrl, CancellationToken ct = default)
+    public async Task<AuthResponse?> LoginAsync(LoginCommand command)
     {
-        try
-        {
-            using var stream = await _http.GetStreamAsync(eventsUrl, ct);
-            await foreach (var item in SseParser.Create(stream).EnumerateAsync(ct))
-            {
-                return item.Data.ToString();
-            }
-        }
-        catch (OperationCanceledException) { }
-        return null;
+        var response = await _http.PostAsJsonAsync("auth/login", command);
+        if (!response.IsSuccessStatusCode)
+            return null;
+        return await response.Content.ReadFromJsonAsync<AuthResponse>();
     }
 
+    // Customers
     public async Task<CustomerReadModel?> GetCustomerAsync(Guid customerId)
     {
         return await _http.GetFromJsonAsync<CustomerReadModel>($"customers/{customerId}");
@@ -49,9 +43,9 @@ public class BankApiClient
                ?? new List<AccountReadModel>();
     }
 
-    public async Task<(Guid Id, string EventsUrl)> OpenAccountAsync(Guid customerId, OpenAccountCommand command)
+    public async Task<(Guid Id, string EventsUrl)> OpenAccountAsync(OpenAccountCommand command)
     {
-        var response = await _http.PostAsJsonAsync($"accounts?customerId={customerId}", command);
+        var response = await _http.PostAsJsonAsync("accounts", command);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<AccountCreatedResponse>();
         return (result!.Id, result.EventsUrl);
@@ -97,7 +91,5 @@ public class BankApiClient
                ?? new List<TransactionReadModel>();
     }
 
-    private sealed record IdResponse(Guid Id);
-    private sealed record CustomerCreatedResponse(Guid Id, string EventsUrl);
     private sealed record AccountCreatedResponse(Guid Id, string EventsUrl);
 }

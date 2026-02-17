@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Aggregates;
@@ -16,28 +17,35 @@ public static class AccountEndpoints
     {
         var group = app.MapGroup("/accounts").WithTags("Accounts");
 
-        group.MapPost("/", OpenAccount).WithName("OpenAccount");
+        group.MapPost("/", OpenAccount).WithName("OpenAccount").RequireAuthorization();
+        group.MapGet("/", ListAccounts).WithName("ListAccounts");
         group.MapGet("/{id:guid}", GetAccount).WithName("GetAccount");
-        group.MapPost("/{id:guid}/deposit", Deposit).WithName("Deposit");
-        group.MapPost("/{id:guid}/withdraw", Withdraw).WithName("Withdraw");
-        group.MapPost("/{id:guid}/close", CloseAccount).WithName("CloseAccount");
+        group.MapPost("/{id:guid}/deposit", Deposit).WithName("Deposit").RequireAuthorization();
+        group.MapPost("/{id:guid}/withdraw", Withdraw).WithName("Withdraw").RequireAuthorization();
+        group.MapPost("/{id:guid}/close", CloseAccount).WithName("CloseAccount").RequireAuthorization();
         group.MapGet("/{id:guid}/transactions", GetTransactions).WithName("GetTransactions");
         group.MapGet("/{id:guid}/events", SubscribeToAccountEvents).WithName("AccountEvents");
 
         // Nested under customers
         app.MapGet("/customers/{customerId:guid}/accounts", GetCustomerAccounts)
             .WithTags("Customers")
-            .WithName("GetCustomerAccounts");
+            .WithName("GetCustomerAccounts")
+            .RequireAuthorization();
+    }
+
+    private static Guid GetCustomerIdFromClaims(HttpContext context)
+    {
+        var claim = context.User.FindFirst("customerId")
+            ?? context.User.FindFirst(ClaimTypes.NameIdentifier);
+        return Guid.Parse(claim!.Value);
     }
 
     private static async Task<IResult> OpenAccount(
         OpenAccountCommand command,
-        HttpRequest request,
+        HttpContext context,
         IAggregateRepository<Account> repository)
     {
-        // CustomerId passed as query param or header for simplicity (no auth yet)
-        if (!Guid.TryParse(request.Query["customerId"], out var customerId))
-            return Results.BadRequest("customerId query parameter is required.");
+        var customerId = GetCustomerIdFromClaims(context);
 
         var accountId = Guid.NewGuid();
         var account = Account.Open(accountId, customerId, command.AccountName);
@@ -67,6 +75,8 @@ public static class AccountEndpoints
             Id = aggregate.Id,
             CustomerId = aggregate.CustomerId,
             AccountName = aggregate.AccountName,
+            AccountNumber = aggregate.AccountNumber,
+            SortCode = aggregate.SortCode,
             Balance = aggregate.Balance,
             IsClosed = aggregate.IsClosed,
             OpenedAt = DateTime.UtcNow,
@@ -77,14 +87,33 @@ public static class AccountEndpoints
     private static async Task<IResult> Deposit(
         Guid id,
         DepositCommand command,
-        IAggregateRepository<Account> repository)
+        IAggregateRepository<Account> accountRepo,
+        IAggregateRepository<SettlementAccount> settlementRepo,
+        IAggregateRepository<LedgerTransaction> ledgerRepo)
     {
-        var account = await repository.LoadAsync(id);
+        var account = await accountRepo.LoadAsync(id);
         if (account.Version < 0)
             return Results.NotFound();
 
         account.Deposit(command.Amount, command.Description);
-        await repository.SaveAsync(account);
+        await accountRepo.SaveAsync(account);
+
+        // Double-entry: debit settlement (money enters the bank)
+        var settlement = await settlementRepo.LoadAsync(SettlementAccount.WellKnownId);
+        if (settlement.Version < 0)
+            settlement = SettlementAccount.Create();
+        settlement.Debit(command.Amount, command.Description);
+        await settlementRepo.SaveAsync(settlement);
+
+        // Record ledger transaction: DR Settlement, CR Customer Account
+        var ledger = LedgerTransaction.Record(
+            Guid.NewGuid(),
+            "Deposit",
+            SettlementAccount.WellKnownId,
+            id,
+            command.Amount,
+            command.Description);
+        await ledgerRepo.SaveAsync(ledger);
 
         return Results.NoContent();
     }
@@ -92,14 +121,33 @@ public static class AccountEndpoints
     private static async Task<IResult> Withdraw(
         Guid id,
         WithdrawCommand command,
-        IAggregateRepository<Account> repository)
+        IAggregateRepository<Account> accountRepo,
+        IAggregateRepository<SettlementAccount> settlementRepo,
+        IAggregateRepository<LedgerTransaction> ledgerRepo)
     {
-        var account = await repository.LoadAsync(id);
+        var account = await accountRepo.LoadAsync(id);
         if (account.Version < 0)
             return Results.NotFound();
 
         account.Withdraw(command.Amount, command.Description);
-        await repository.SaveAsync(account);
+        await accountRepo.SaveAsync(account);
+
+        // Double-entry: credit settlement (money leaves the bank)
+        var settlement = await settlementRepo.LoadAsync(SettlementAccount.WellKnownId);
+        if (settlement.Version < 0)
+            settlement = SettlementAccount.Create();
+        settlement.Credit(command.Amount, command.Description);
+        await settlementRepo.SaveAsync(settlement);
+
+        // Record ledger transaction: DR Customer Account, CR Settlement
+        var ledger = LedgerTransaction.Record(
+            Guid.NewGuid(),
+            "Withdrawal",
+            id,
+            SettlementAccount.WellKnownId,
+            command.Amount,
+            command.Description);
+        await ledgerRepo.SaveAsync(ledger);
 
         return Results.NoContent();
     }
@@ -132,12 +180,26 @@ public static class AccountEndpoints
 
     private static async Task<IResult> GetCustomerAccounts(
         Guid customerId,
+        HttpContext context,
         IReadStore readStore)
     {
+        // Verify the authenticated user owns this customer ID
+        var authCustomerId = GetCustomerIdFromClaims(context);
+        if (authCustomerId != customerId)
+            return Results.Forbid();
+
         var accounts = await readStore.QueryAsync<AccountReadModel>(
             new QueryDefinition(
                 "SELECT * FROM c WHERE c.customerId = @customerId AND c.partitionKey = 'account'")
                 .WithParameter("@customerId", customerId.ToString()));
+
+        return Results.Ok(accounts);
+    }
+
+    private static async Task<IResult> ListAccounts(IReadStore readStore)
+    {
+        var accounts = await readStore.QueryAsync<AccountReadModel>(
+            new QueryDefinition("SELECT * FROM c WHERE c.partitionKey = 'account'"));
 
         return Results.Ok(accounts);
     }

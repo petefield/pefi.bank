@@ -5,8 +5,12 @@
     <Project Path="src/Pefi.Bank.CustomerPortal/Pefi.Bank.CustomerPortal.csproj" />
     <Project Path="src/Pefi.Bank.Domain/Pefi.Bank.Domain.csproj" />
     <Project Path="src/Pefi.Bank.Functions/Pefi.Bank.Functions.csproj" />
+    <Project Path="src/Pefi.Bank.Auth/Pefi.Bank.Auth.csproj" />
     <Project Path="src/Pefi.Bank.Infrastructure/Pefi.Bank.Infrastructure.csproj" />
     <Project Path="src/Pefi.Bank.Shared/Pefi.Bank.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="src/Pefi.Bank.Seeder/Pefi.Bank.Seeder.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Pefi.Bank.Api.Tests/Pefi.Bank.Api.Tests.csproj" />

@@ -23,8 +23,15 @@ public static class EventSerializer
         [nameof(FundsWithdrawn)] = typeof(FundsWithdrawn),
         [nameof(AccountClosed)] = typeof(AccountClosed),
         [nameof(TransferInitiated)] = typeof(TransferInitiated),
+        [nameof(TransferSourceDebited)] = typeof(TransferSourceDebited),
+        [nameof(TransferDestinationCredited)] = typeof(TransferDestinationCredited),
+        [nameof(TransferSourceDebitCompensated)] = typeof(TransferSourceDebitCompensated),
         [nameof(TransferCompleted)] = typeof(TransferCompleted),
         [nameof(TransferFailed)] = typeof(TransferFailed),
+        [nameof(SettlementAccountCreated)] = typeof(SettlementAccountCreated),
+        [nameof(SettlementCredited)] = typeof(SettlementCredited),
+        [nameof(SettlementDebited)] = typeof(SettlementDebited),
+        [nameof(LedgerTransactionRecorded)] = typeof(LedgerTransactionRecorded),
     };
 
     public static string Serialize(IEvent @event) =>

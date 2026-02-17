@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Pefi.Bank.Api\Pefi.Bank.Api.csproj" />
+    <ProjectReference Include="..\..\src\Pefi.Bank.Auth\Pefi.Bank.Auth.csproj" />
     <ProjectReference Include="..\..\src\Pefi.Bank.Domain\Pefi.Bank.Domain.csproj" />
     <ProjectReference Include="..\..\src\Pefi.Bank.Infrastructure\Pefi.Bank.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Pefi.Bank.Shared\Pefi.Bank.Shared.csproj" />

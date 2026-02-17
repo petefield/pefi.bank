@@ -7,6 +7,15 @@ public sealed record TransferInitiated(
     decimal Amount,
     string Description) : DomainEvent;
 
+public sealed record TransferSourceDebited(
+    Guid TransferId) : DomainEvent;
+
+public sealed record TransferDestinationCredited(
+    Guid TransferId) : DomainEvent;
+
+public sealed record TransferSourceDebitCompensated(
+    Guid TransferId) : DomainEvent;
+
 public sealed record TransferCompleted(
     Guid TransferId) : DomainEvent;
 

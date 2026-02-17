@@ -34,6 +34,8 @@ else
             <table>
                 <thead>
                     <tr>
+                        <th>Sort Code</th>
+                        <th>Account No.</th>
                         <th>Account Name</th>
                         <th>Balance</th>
                         <th>Status</th>
@@ -45,6 +47,8 @@ else
                     @foreach (var account in _accounts)
                     {
                         <tr>
+                            <td>@account.SortCode</td>
+                            <td>@account.AccountNumber</td>
                             <td>@account.AccountName</td>
                             <td>@account.Balance.ToString("C")</td>
                             <td>

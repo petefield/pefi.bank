@@ -10,7 +10,16 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5100/";
 
 builder.Services.AddSingleton<CustomerState>();
+builder.Services.AddScoped<AuthTokenHandler>();
 builder.Services.AddScoped<BankApiClient>();
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
+builder.Services.AddScoped(sp =>
+{
+    var state = sp.GetRequiredService<CustomerState>();
+    var handler = new AuthTokenHandler(state)
+    {
+        InnerHandler = new HttpClientHandler()
+    };
+    return new HttpClient(handler) { BaseAddress = new Uri(apiBaseUrl) };
+});
 
 await builder.Build().RunAsync();

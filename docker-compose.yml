@@ -77,6 +77,10 @@ services:
       - ConnectionStrings__CosmosDb=AccountEndpoint=https://cosmosdb:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
       - CosmosDb__DatabaseName=pefibank
       - Redis__ConnectionString=redis:6379
+      - Jwt__Secret=PefiBankDockerSecretKey_MustBeAtLeast32BytesLong!
+      - Jwt__Issuer=PefiBank
+      - Jwt__Audience=PefiBankCustomers
+      - Jwt__ExpiryMinutes=480
     depends_on:
       cosmosdb:
         condition: service_healthy
@@ -127,6 +131,17 @@ services:
       - "5300:80"
     depends_on:
       - api
+
+  seeder:
+    build:
+      context: .
+      dockerfile: src/Pefi.Bank.Seeder/Dockerfile
+    container_name: pefi-seeder
+    profiles:
+      - seed
+    depends_on:
+      - api
+    command: ["--url", "http://api:8080", "--customers", "10", "--min-accounts", "2", "--max-accounts", "4"]
 
 volumes:
   cosmosdb-data:

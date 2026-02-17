@@ -5,8 +5,12 @@ namespace Pefi.Bank.Domain.Aggregates;
 
 public class Account : Aggregate
 {
+    private const string BankSortCode = "04-00-75";
+
     public Guid CustomerId { get; private set; }
     public string AccountName { get; private set; } = string.Empty;
+    public string AccountNumber { get; private set; } = string.Empty;
+    public string SortCode { get; private set; } = string.Empty;
     public decimal Balance { get; private set; }
     public bool IsClosed { get; private set; }
 
@@ -14,8 +18,10 @@ public class Account : Aggregate
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(accountName);
 
+        var accountNumber = GenerateAccountNumber(accountId);
+
         var account = new Account();
-        account.RaiseEvent(new AccountOpened(accountId, customerId, accountName));
+        account.RaiseEvent(new AccountOpened(accountId, customerId, accountName, accountNumber, BankSortCode));
         return account;
     }
 
@@ -58,6 +64,13 @@ public class Account : Aggregate
             throw new DomainException("Account is closed.");
     }
 
+    private static string GenerateAccountNumber(Guid accountId)
+    {
+        // Derive a deterministic 8-digit account number from the account ID
+        var hash = Math.Abs(accountId.GetHashCode());
+        return (hash % 90_000_000 + 10_000_000).ToString();
+    }
+
     protected override void Apply(IEvent @event)
     {
         switch (@event)
@@ -66,6 +79,8 @@ public class Account : Aggregate
                 Id = e.AccountId;
                 CustomerId = e.CustomerId;
                 AccountName = e.AccountName;
+                AccountNumber = e.AccountNumber;
+                SortCode = e.SortCode;
                 Balance = 0;
                 IsClosed = false;
                 break;

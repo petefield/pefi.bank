@@ -1,10 +1,9 @@
+using System.Security.Claims;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Aggregates;
-using Pefi.Bank.Domain.Exceptions;
 using Pefi.Bank.Infrastructure.ReadStore;
 using Pefi.Bank.Shared.Commands;
 using Pefi.Bank.Shared.ReadModels;
-using Microsoft.Azure.Cosmos;
 
 namespace Pefi.Bank.Api.Endpoints;
 
@@ -14,27 +13,31 @@ public static class TransferEndpoints
     {
         var group = app.MapGroup("/transfers").WithTags("Transfers");
 
-        group.MapPost("/", InitiateTransfer).WithName("InitiateTransfer");
+        group.MapPost("/", InitiateTransfer).WithName("InitiateTransfer").RequireAuthorization();
         group.MapGet("/{id:guid}", GetTransfer).WithName("GetTransfer");
     }
 
     private static async Task<IResult> InitiateTransfer(
         TransferCommand command,
-        IAggregateRepository<Account> accountRepo,
-        IAggregateRepository<Transfer> transferRepo)
+        HttpContext context,
+        IAggregateRepository<Transfer> transferRepo,
+        IAggregateRepository<Account> accountRepo)
     {
+        // Verify the source account belongs to the authenticated customer
+        var claim = context.User.FindFirst("customerId")
+            ?? context.User.FindFirst(ClaimTypes.NameIdentifier);
+        var authCustomerId = Guid.Parse(claim!.Value);
+
+        var sourceAccount = await accountRepo.LoadAsync(command.SourceAccountId);
+        if (sourceAccount.Version < 0)
+            return Results.NotFound(new { error = "Source account not found." });
+
+        if (sourceAccount.CustomerId != authCustomerId)
+            return Results.Forbid();
+
         var transferId = Guid.NewGuid();
 
-        // Load both accounts
-        var source = await accountRepo.LoadAsync(command.SourceAccountId);
-        if (source.Version < 0)
-            return Results.BadRequest("Source account not found.");
-
-        var destination = await accountRepo.LoadAsync(command.DestinationAccountId);
-        if (destination.Version < 0)
-            return Results.BadRequest("Destination account not found.");
-
-        // Create the transfer
+        // Create the transfer — saga will handle the rest via change feed
         var transfer = Transfer.Initiate(
             transferId,
             command.SourceAccountId,
@@ -42,27 +45,11 @@ public static class TransferEndpoints
             command.Amount,
             command.Description);
 
-        try
-        {
-            // Withdraw from source
-            source.Withdraw(command.Amount, $"Transfer to {command.DestinationAccountId}: {command.Description}");
-            await accountRepo.SaveAsync(source);
-
-            // Deposit to destination
-            destination.Deposit(command.Amount, $"Transfer from {command.SourceAccountId}: {command.Description}");
-            await accountRepo.SaveAsync(destination);
-
-            // Mark transfer complete
-            transfer.Complete();
-        }
-        catch (DomainException ex)
-        {
-            transfer.Fail(ex.Message);
-        }
-
         await transferRepo.SaveAsync(transfer);
 
-        return Results.Created($"/transfers/{transferId}", new { id = transferId, status = transfer.Status.ToString() });
+        return Results.Accepted(
+            $"/transfers/{transferId}",
+            new { id = transferId, status = transfer.Status.ToString() });
     }
 
     private static async Task<IResult> GetTransfer(

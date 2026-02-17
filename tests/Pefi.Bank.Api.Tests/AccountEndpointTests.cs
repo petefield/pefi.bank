@@ -23,19 +23,21 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
         _client = factory.CreateClient();
     }
 
-    private async Task<Guid> CreateCustomerAsync()
+    private async Task<(Guid CustomerId, HttpClient AuthClient)> RegisterCustomerAsync()
     {
-        var command = new CreateCustomerCommand("Test", "Customer", $"test{Guid.NewGuid():N}@example.com");
-        var response = await _client.PostAsJsonAsync("/customers", command);
+        var email = $"test.{Guid.NewGuid():N}@example.com";
+        var command = new RegisterCommand("Test", "Customer", email, "Password123!");
+        var response = await _client.PostAsJsonAsync("/auth/register", command);
         response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return Guid.Parse(body.GetProperty("id").GetString()!);
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        var authClient = _factory.CreateAuthenticatedClient(auth!.CustomerId, email);
+        return (auth.CustomerId, authClient);
     }
 
-    private async Task<Guid> OpenAccountAsync(Guid customerId, string name = "Checking")
+    private async Task<Guid> OpenAccountAsync(HttpClient authClient, string name = "Checking")
     {
         var command = new OpenAccountCommand(name);
-        var response = await _client.PostAsJsonAsync($"/accounts?customerId={customerId}", command);
+        var response = await authClient.PostAsJsonAsync("/accounts", command);
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         return Guid.Parse(body.GetProperty("id").GetString()!);
@@ -44,10 +46,10 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task OpenAccount_ReturnsAccepted_WithIdAndEventsUrl()
     {
-        var customerId = await CreateCustomerAsync();
+        var (_, authClient) = await RegisterCustomerAsync();
         var command = new OpenAccountCommand("Savings");
 
-        var response = await _client.PostAsJsonAsync($"/accounts?customerId={customerId}", command);
+        var response = await authClient.PostAsJsonAsync("/accounts", command);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -58,13 +60,13 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     }
 
     [Fact]
-    public async Task OpenAccount_WithoutCustomerId_ReturnsBadRequest()
+    public async Task OpenAccount_WithoutAuth_ReturnsUnauthorized()
     {
         var command = new OpenAccountCommand("Savings");
 
         var response = await _client.PostAsJsonAsync("/accounts", command);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -103,11 +105,11 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task Deposit_ReturnsNoContent()
     {
-        var customerId = await CreateCustomerAsync();
-        var accountId = await OpenAccountAsync(customerId);
+        var (_, authClient) = await RegisterCustomerAsync();
+        var accountId = await OpenAccountAsync(authClient);
 
         var command = new DepositCommand(500.00m, "Initial deposit");
-        var response = await _client.PostAsJsonAsync($"/accounts/{accountId}/deposit", command);
+        var response = await authClient.PostAsJsonAsync($"/accounts/{accountId}/deposit", command);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
@@ -115,11 +117,11 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task Deposit_ZeroAmount_ReturnsBadRequest()
     {
-        var customerId = await CreateCustomerAsync();
-        var accountId = await OpenAccountAsync(customerId);
+        var (_, authClient) = await RegisterCustomerAsync();
+        var accountId = await OpenAccountAsync(authClient);
 
         var command = new DepositCommand(0m, "Zero deposit");
-        var response = await _client.PostAsJsonAsync($"/accounts/{accountId}/deposit", command);
+        var response = await authClient.PostAsJsonAsync($"/accounts/{accountId}/deposit", command);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -127,16 +129,16 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task Withdraw_AfterDeposit_ReturnsNoContent()
     {
-        var customerId = await CreateCustomerAsync();
-        var accountId = await OpenAccountAsync(customerId);
+        var (_, authClient) = await RegisterCustomerAsync();
+        var accountId = await OpenAccountAsync(authClient);
 
         // Deposit first
         var depositCommand = new DepositCommand(1000.00m, "Deposit");
-        await _client.PostAsJsonAsync($"/accounts/{accountId}/deposit", depositCommand);
+        await authClient.PostAsJsonAsync($"/accounts/{accountId}/deposit", depositCommand);
 
         // Then withdraw
         var withdrawCommand = new WithdrawCommand(200.00m, "Withdrawal");
-        var response = await _client.PostAsJsonAsync($"/accounts/{accountId}/withdraw", withdrawCommand);
+        var response = await authClient.PostAsJsonAsync($"/accounts/{accountId}/withdraw", withdrawCommand);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
@@ -144,12 +146,12 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task Withdraw_InsufficientFunds_ReturnsBadRequest()
     {
-        var customerId = await CreateCustomerAsync();
-        var accountId = await OpenAccountAsync(customerId);
+        var (_, authClient) = await RegisterCustomerAsync();
+        var accountId = await OpenAccountAsync(authClient);
 
         // Try to withdraw from empty account
         var command = new WithdrawCommand(100.00m, "Overdraft attempt");
-        var response = await _client.PostAsJsonAsync($"/accounts/{accountId}/withdraw", command);
+        var response = await authClient.PostAsJsonAsync($"/accounts/{accountId}/withdraw", command);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -159,10 +161,10 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task CloseAccount_WithZeroBalance_ReturnsNoContent()
     {
-        var customerId = await CreateCustomerAsync();
-        var accountId = await OpenAccountAsync(customerId);
+        var (_, authClient) = await RegisterCustomerAsync();
+        var accountId = await OpenAccountAsync(authClient);
 
-        var response = await _client.PostAsync($"/accounts/{accountId}/close", null);
+        var response = await authClient.PostAsync($"/accounts/{accountId}/close", null);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
@@ -170,15 +172,15 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task CloseAccount_WithBalance_ReturnsBadRequest()
     {
-        var customerId = await CreateCustomerAsync();
-        var accountId = await OpenAccountAsync(customerId);
+        var (_, authClient) = await RegisterCustomerAsync();
+        var accountId = await OpenAccountAsync(authClient);
 
         // Deposit money first
         var depositCommand = new DepositCommand(100.00m, "Deposit");
-        await _client.PostAsJsonAsync($"/accounts/{accountId}/deposit", depositCommand);
+        await authClient.PostAsJsonAsync($"/accounts/{accountId}/deposit", depositCommand);
 
         // Try to close
-        var response = await _client.PostAsync($"/accounts/{accountId}/close", null);
+        var response = await authClient.PostAsync($"/accounts/{accountId}/close", null);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -188,7 +190,9 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task CloseAccount_NotFound_Returns404()
     {
-        var response = await _client.PostAsync($"/accounts/{Guid.NewGuid()}/close", null);
+        var (_, authClient) = await RegisterCustomerAsync();
+
+        var response = await authClient.PostAsync($"/accounts/{Guid.NewGuid()}/close", null);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -196,15 +200,15 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task Deposit_OnClosedAccount_ReturnsBadRequest()
     {
-        var customerId = await CreateCustomerAsync();
-        var accountId = await OpenAccountAsync(customerId);
+        var (_, authClient) = await RegisterCustomerAsync();
+        var accountId = await OpenAccountAsync(authClient);
 
         // Close the account
-        await _client.PostAsync($"/accounts/{accountId}/close", null);
+        await authClient.PostAsync($"/accounts/{accountId}/close", null);
 
         // Try to deposit
         var command = new DepositCommand(100.00m, "Should fail");
-        var response = await _client.PostAsJsonAsync($"/accounts/{accountId}/deposit", command);
+        var response = await authClient.PostAsJsonAsync($"/accounts/{accountId}/deposit", command);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -224,10 +228,20 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task GetCustomerAccounts_ReturnsOk()
     {
+        var (customerId, authClient) = await RegisterCustomerAsync();
+
+        var response = await authClient.GetAsync($"/customers/{customerId}/accounts");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetCustomerAccounts_WithoutAuth_ReturnsUnauthorized()
+    {
         var customerId = Guid.NewGuid();
 
         var response = await _client.GetAsync($"/customers/{customerId}/accounts");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 }

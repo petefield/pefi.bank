@@ -23,73 +23,64 @@ public class TransferEndpointTests : IClassFixture<BankApiFactory>
         _client = factory.CreateClient();
     }
 
-    private async Task<Guid> CreateCustomerAsync()
+    private async Task<(Guid CustomerId, HttpClient AuthClient)> RegisterCustomerAsync()
     {
-        var command = new CreateCustomerCommand("Transfer", "User", $"transfer{Guid.NewGuid():N}@example.com");
-        var response = await _client.PostAsJsonAsync("/customers", command);
+        var email = $"transfer.{Guid.NewGuid():N}@example.com";
+        var command = new RegisterCommand("Transfer", "User", email, "Password123!");
+        var response = await _client.PostAsJsonAsync("/auth/register", command);
         response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        var authClient = _factory.CreateAuthenticatedClient(auth!.CustomerId, email);
+        return (auth.CustomerId, authClient);
+    }
+
+    private async Task<Guid> OpenAccountAsync(HttpClient authClient, string name = "Account")
+    {
+        var openCommand = new OpenAccountCommand(name);
+        var openResponse = await authClient.PostAsJsonAsync("/accounts", openCommand);
+        openResponse.EnsureSuccessStatusCode();
+        var body = await openResponse.Content.ReadFromJsonAsync<JsonElement>();
         return Guid.Parse(body.GetProperty("id").GetString()!);
     }
 
-    private async Task<Guid> OpenAndFundAccountAsync(Guid customerId, decimal initialBalance, string name = "Account")
-    {
-        var openCommand = new OpenAccountCommand(name);
-        var openResponse = await _client.PostAsJsonAsync($"/accounts?customerId={customerId}", openCommand);
-        openResponse.EnsureSuccessStatusCode();
-        var body = await openResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var accountId = Guid.Parse(body.GetProperty("id").GetString()!);
-
-        if (initialBalance > 0)
-        {
-            var depositCommand = new DepositCommand(initialBalance, "Initial funding");
-            var depositResponse = await _client.PostAsJsonAsync($"/accounts/{accountId}/deposit", depositCommand);
-            depositResponse.EnsureSuccessStatusCode();
-        }
-
-        return accountId;
-    }
-
     [Fact]
-    public async Task InitiateTransfer_ReturnsCreated_WithCompletedStatus()
+    public async Task InitiateTransfer_ReturnsAccepted_WithInitiatedStatus()
     {
-        var customerId = await CreateCustomerAsync();
-        var sourceId = await OpenAndFundAccountAsync(customerId, 1000.00m, "Source");
-        var destId = await OpenAndFundAccountAsync(customerId, 0m, "Destination");
+        var (_, authClient) = await RegisterCustomerAsync();
+        var sourceId = await OpenAccountAsync(authClient, "Source");
+        var destId = await OpenAccountAsync(authClient, "Destination");
+
+        // Fund source account
+        var depositCommand = new DepositCommand(1000.00m, "Initial funding");
+        var depositResponse = await authClient.PostAsJsonAsync($"/accounts/{sourceId}/deposit", depositCommand);
+        depositResponse.EnsureSuccessStatusCode();
 
         var command = new TransferCommand(sourceId, destId, 250.00m, "Rent payment");
-        var response = await _client.PostAsJsonAsync("/transfers", command);
+        var response = await authClient.PostAsJsonAsync("/transfers", command);
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(body.TryGetProperty("id", out _));
-        Assert.Equal("Completed", body.GetProperty("status").GetString());
+        Assert.Equal("Initiated", body.GetProperty("status").GetString());
     }
 
     [Fact]
-    public async Task InitiateTransfer_InsufficientFunds_ReturnsCreated_WithFailedStatus()
+    public async Task InitiateTransfer_WithoutAuth_ReturnsUnauthorized()
     {
-        var customerId = await CreateCustomerAsync();
-        var sourceId = await OpenAndFundAccountAsync(customerId, 100.00m, "Low Balance");
-        var destId = await OpenAndFundAccountAsync(customerId, 0m, "Destination");
-
-        var command = new TransferCommand(sourceId, destId, 500.00m, "Too much");
+        var command = new TransferCommand(Guid.NewGuid(), Guid.NewGuid(), 100.00m, "Unauth transfer");
         var response = await _client.PostAsJsonAsync("/transfers", command);
 
-        // Transfer still gets created but with Failed status
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("Failed", body.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
     public async Task InitiateTransfer_SameAccount_ReturnsBadRequest()
     {
-        var customerId = await CreateCustomerAsync();
-        var accountId = await OpenAndFundAccountAsync(customerId, 500.00m, "Self Transfer");
+        var (_, authClient) = await RegisterCustomerAsync();
+        var accountId = await OpenAccountAsync(authClient, "Self Transfer");
 
         var command = new TransferCommand(accountId, accountId, 100.00m, "Self transfer");
-        var response = await _client.PostAsJsonAsync("/transfers", command);
+        var response = await authClient.PostAsJsonAsync("/transfers", command);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -97,36 +88,25 @@ public class TransferEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task InitiateTransfer_ZeroAmount_ReturnsBadRequest()
     {
-        var customerId = await CreateCustomerAsync();
-        var sourceId = await OpenAndFundAccountAsync(customerId, 500.00m, "Source");
-        var destId = await OpenAndFundAccountAsync(customerId, 0m, "Dest");
+        var (_, authClient) = await RegisterCustomerAsync();
+        var sourceId = await OpenAccountAsync(authClient, "Source");
+        var destId = await OpenAccountAsync(authClient, "Dest");
 
         var command = new TransferCommand(sourceId, destId, 0m, "Zero transfer");
-        var response = await _client.PostAsJsonAsync("/transfers", command);
+        var response = await authClient.PostAsJsonAsync("/transfers", command);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
-    public async Task InitiateTransfer_SourceNotFound_ReturnsBadRequest()
+    public async Task InitiateTransfer_NegativeAmount_ReturnsBadRequest()
     {
-        var customerId = await CreateCustomerAsync();
-        var destId = await OpenAndFundAccountAsync(customerId, 0m, "Dest");
+        var (_, authClient) = await RegisterCustomerAsync();
+        var sourceId = await OpenAccountAsync(authClient, "Source");
+        var destId = await OpenAccountAsync(authClient, "Dest");
 
-        var command = new TransferCommand(Guid.NewGuid(), destId, 100.00m, "No source");
-        var response = await _client.PostAsJsonAsync("/transfers", command);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task InitiateTransfer_DestinationNotFound_ReturnsBadRequest()
-    {
-        var customerId = await CreateCustomerAsync();
-        var sourceId = await OpenAndFundAccountAsync(customerId, 500.00m, "Source");
-
-        var command = new TransferCommand(sourceId, Guid.NewGuid(), 100.00m, "No dest");
-        var response = await _client.PostAsJsonAsync("/transfers", command);
+        var command = new TransferCommand(sourceId, destId, -50m, "Negative transfer");
+        var response = await authClient.PostAsJsonAsync("/transfers", command);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
