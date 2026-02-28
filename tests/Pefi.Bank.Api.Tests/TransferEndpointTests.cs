@@ -116,16 +116,19 @@ public class TransferEndpointTests : IClassFixture<BankApiFactory>
     {
         var id = Guid.NewGuid();
         var model = new TransferReadModel
-        {
-            Id = id,
-            SourceAccountId = Guid.NewGuid(),
-            DestinationAccountId = Guid.NewGuid(),
-            Amount = 100.00m,
-            Description = "Test transfer",
-            Status = "Completed",
-            InitiatedAt = DateTime.UtcNow,
-            CompletedAt = DateTime.UtcNow
-        };
+        (
+            Id: id,
+            SourceAccountId: Guid.NewGuid(),
+            DestinationAccountId: Guid.NewGuid(),
+            Amount: 100.00m,
+            Description: "Test transfer",
+            Status: "Completed",
+            FailureReason: null,    
+            InitiatedAt: DateTime.UtcNow,
+            UpdatedAt: DateTime.UtcNow,
+            CompletedAt: DateTime.UtcNow
+            
+        );
         _factory.ReadStore.Seed(id.ToString(), "transfer", model);
 
         var response = await _client.GetAsync($"/transfers/{id}");

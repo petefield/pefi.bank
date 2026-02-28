@@ -2,12 +2,13 @@ using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Azure.Cosmos;
+using Pefi.Bank.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pefi.Bank.Auth;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Infrastructure.ReadStore;
+using Pefi.Bank.Shared.Queries;
 using StackExchange.Redis;
 
 namespace Pefi.Bank.Api.Tests.Fakes;
@@ -35,7 +36,7 @@ public class BankApiFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             // Remove CosmosDB registrations
-            services.RemoveAll<CosmosClient>();
+            services.RemoveAll<CosmosClientHolder>();
             services.RemoveAll<IEventStore>();
             services.RemoveAll<IReadStore>();
 
@@ -46,6 +47,16 @@ public class BankApiFactory : WebApplicationFactory<Program>
             // Register in-memory fakes as singletons (same instance throughout test)
             services.AddSingleton<IEventStore>(EventStore);
             services.AddSingleton<IReadStore>(ReadStore);
+
+            // Replace Cosmos query services with in-memory fakes
+            services.RemoveAll<IAccountQueries>();
+            services.RemoveAll<ITransactionQueries>();
+            services.RemoveAll<ILedgerQueries>();
+            services.RemoveAll<ICustomerQueries>();
+            services.AddSingleton<IAccountQueries>(new InMemoryAccountQueries(ReadStore));
+            services.AddSingleton<ITransactionQueries>(new InMemoryTransactionQueries(ReadStore));
+            services.AddSingleton<ILedgerQueries>(new InMemoryLedgerQueries(ReadStore));
+            services.AddSingleton<ICustomerQueries>(new InMemoryCustomerQueries(ReadStore));
 
             // Replace Cosmos-based user store with in-memory
             services.RemoveAll<IUserStore<ApplicationUser>>();

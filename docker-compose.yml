@@ -81,11 +81,19 @@ services:
       - Jwt__Issuer=PefiBank
       - Jwt__Audience=PefiBankCustomers
       - Jwt__ExpiryMinutes=480
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889
+      - OTEL_SERVICE_NAME=pefi-bank-api
     depends_on:
       cosmosdb:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     restart: on-failure
 
   functions:
@@ -103,6 +111,8 @@ services:
       - AzureFunctionsJobHost__logging__console__isEnabled=true
       - AZURE_FUNCTIONS_ENVIRONMENT=Development
       - Redis__ConnectionString=redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889
+      - OTEL_SERVICE_NAME=pefi-bank-functions
     depends_on:
       cosmosdb:
         condition: service_healthy
@@ -111,6 +121,15 @@ services:
       redis:
         condition: service_healthy
     restart: on-failure
+
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0
+    container_name: pefi-aspire-dashboard
+    ports:
+      - "18888:18888"
+      - "18889:18889"
+    environment:
+      - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true
 
   customer-portal:
     build:

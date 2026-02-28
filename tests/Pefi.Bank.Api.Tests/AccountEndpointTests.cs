@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Pefi.Bank.Api.Tests.Fakes;
+using Pefi.Bank.Domain.Events;
 using Pefi.Bank.Shared.Commands;
 using Pefi.Bank.Shared.ReadModels;
 
@@ -74,15 +75,18 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     {
         var id = Guid.NewGuid();
         var model = new AccountReadModel
-        {
-            Id = id,
-            CustomerId = Guid.NewGuid(),
-            AccountName = "Checking",
-            Balance = 100.00m,
-            IsClosed = false,
-            OpenedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+        (
+            Id: id,
+            CustomerId : Guid.NewGuid(),
+            AccountName : "Checking",
+            AccountNumber : "12345678",
+            SortCode : "12-34-56",
+            Balance : 100.00m,
+            IsClosed :false,
+            OpenedAt : DateTime.UtcNow,
+            UpdatedAt : DateTime.UtcNow,
+            OverdraftLimit: 0
+        );
         _factory.ReadStore.Seed(id.ToString(), "account", model);
 
         var response = await _client.GetAsync($"/accounts/{id}");
@@ -103,7 +107,7 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     }
 
     [Fact]
-    public async Task Deposit_ReturnsNoContent()
+    public async Task Deposit_ReturnsAccepted_WithTransferInfo()
     {
         var (_, authClient) = await RegisterCustomerAsync();
         var accountId = await OpenAccountAsync(authClient);
@@ -111,7 +115,10 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
         var command = new DepositCommand(500.00m, "Initial deposit");
         var response = await authClient.PostAsJsonAsync($"/accounts/{accountId}/deposit", command);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.TryGetProperty("id", out _));
+        Assert.True(body.TryGetProperty("eventsUrl", out _));
     }
 
     [Fact]
@@ -127,35 +134,18 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     }
 
     [Fact]
-    public async Task Withdraw_AfterDeposit_ReturnsNoContent()
+    public async Task Withdraw_ReturnsAccepted_WithTransferInfo()
     {
         var (_, authClient) = await RegisterCustomerAsync();
         var accountId = await OpenAccountAsync(authClient);
 
-        // Deposit first
-        var depositCommand = new DepositCommand(1000.00m, "Deposit");
-        await authClient.PostAsJsonAsync($"/accounts/{accountId}/deposit", depositCommand);
-
-        // Then withdraw
-        var withdrawCommand = new WithdrawCommand(200.00m, "Withdrawal");
-        var response = await authClient.PostAsJsonAsync($"/accounts/{accountId}/withdraw", withdrawCommand);
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Withdraw_InsufficientFunds_ReturnsBadRequest()
-    {
-        var (_, authClient) = await RegisterCustomerAsync();
-        var accountId = await OpenAccountAsync(authClient);
-
-        // Try to withdraw from empty account
-        var command = new WithdrawCommand(100.00m, "Overdraft attempt");
+        var command = new WithdrawCommand(200.00m, "Withdrawal");
         var response = await authClient.PostAsJsonAsync($"/accounts/{accountId}/withdraw", command);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Contains("Insufficient funds", body.GetProperty("error").GetString());
+        Assert.True(body.TryGetProperty("id", out _));
+        Assert.True(body.TryGetProperty("eventsUrl", out _));
     }
 
     [Fact]
@@ -172,14 +162,14 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
     [Fact]
     public async Task CloseAccount_WithBalance_ReturnsBadRequest()
     {
-        var (_, authClient) = await RegisterCustomerAsync();
+        var (customerId, authClient) = await RegisterCustomerAsync();
         var accountId = await OpenAccountAsync(authClient);
 
-        // Deposit money first
-        var depositCommand = new DepositCommand(100.00m, "Deposit");
-        await authClient.PostAsJsonAsync($"/accounts/{accountId}/deposit", depositCommand);
+        // Deposit directly via event store (deposit endpoint is async via saga)
+        var depositEvent = new FundsDeposited(accountId, 100.00m, "Setup deposit");
+        await _factory.EventStore.AppendEventsAsync($"Account-{accountId}", [depositEvent], 0);
 
-        // Try to close
+        // Try to close — should fail because balance is non-zero
         var response = await authClient.PostAsync($"/accounts/{accountId}/close", null);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -195,24 +185,6 @@ public class AccountEndpointTests : IClassFixture<BankApiFactory>
         var response = await authClient.PostAsync($"/accounts/{Guid.NewGuid()}/close", null);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Deposit_OnClosedAccount_ReturnsBadRequest()
-    {
-        var (_, authClient) = await RegisterCustomerAsync();
-        var accountId = await OpenAccountAsync(authClient);
-
-        // Close the account
-        await authClient.PostAsync($"/accounts/{accountId}/close", null);
-
-        // Try to deposit
-        var command = new DepositCommand(100.00m, "Should fail");
-        var response = await authClient.PostAsJsonAsync($"/accounts/{accountId}/deposit", command);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Contains("closed", body.GetProperty("error").GetString());
     }
 
     [Fact]

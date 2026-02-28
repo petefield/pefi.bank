@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 
 namespace Pefi.Bank.CustomerPortal.Services;
@@ -20,6 +21,13 @@ public class AuthTokenHandler : DelegatingHandler
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _state.Token);
         }
 
-        return await base.SendAsync(request, cancellationToken);
+        var response = await base.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized && _state.IsLoggedIn)
+        {
+            _state.Clear();
+        }
+
+        return response;
     }
 }

@@ -68,17 +68,17 @@ public static class TransferEndpoints
         if (aggregate.Version < 0)
             return Results.NotFound();
 
-        return Results.Ok(new TransferReadModel
-        {
-            Id = aggregate.Id,
-            SourceAccountId = aggregate.SourceAccountId,
-            DestinationAccountId = aggregate.DestinationAccountId,
-            Amount = aggregate.Amount,
-            Description = aggregate.Description,
-            Status = aggregate.Status.ToString(),
-            FailureReason = aggregate.FailureReason,
-            InitiatedAt = DateTime.UtcNow,
-            CompletedAt = aggregate.Status == TransferStatus.Completed ? DateTime.UtcNow : null
-        });
+        return Results.Ok(new TransferReadModel(
+            Id: aggregate.Id,
+            SourceAccountId: aggregate.SourceAccountId,
+            DestinationAccountId: aggregate.DestinationAccountId,
+            Amount: aggregate.Amount,
+            Description: aggregate.Description,
+            Status: aggregate.Status.ToString(),
+            FailureReason: aggregate.FailureReason,
+            InitiatedAt: DateTime.UtcNow,
+            UpdatedAt: DateTime.UtcNow,
+            CompletedAt: aggregate.Status == TransferStatus.Completed ? DateTime.UtcNow : null
+        ));
     }
 }

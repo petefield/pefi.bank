@@ -58,8 +58,4 @@ public sealed class AdminApiClient
                ?? [];
     }
 
-    public async Task<SettlementAccountReadModel?> GetSettlementAccountAsync()
-    {
-        return await _http.GetFromJsonAsync<SettlementAccountReadModel>("settlement");
-    }
 }

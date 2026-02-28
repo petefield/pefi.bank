@@ -1,0 +1,113 @@
+@page "/signin"
+@implements IDisposable
+@inject BankApiClient Api
+@inject CustomerState State
+@inject NavigationManager Nav
+
+@if (State.IsLoggedIn)
+{
+    <p>Redirecting...</p>
+}
+else
+{
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="auth-brand-icon">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L3 7v2h18V7L12 2zm0 2.18L17.36 7H6.64L12 4.18zM5 11v6c0 .55.45 1 1 1h3v-8H5zm5 0v8h4v-8h-4zm5 0v8h3c.55 0 1-.45 1-1v-6h-4zM3 20v2h18v-2H3z"/>
+                    </svg>
+                </div>
+                <div class="auth-brand-title">Welcome to Pefi Bank</div>
+                <div class="auth-brand-subtitle">Your modern banking experience</div>
+            </div>
+
+            <div class="card">
+                <h4 class="section-title mb-3">Sign In</h4>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" @bind="email" placeholder="you@example.com" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" @bind="password" placeholder="Enter your password" />
+                </div>
+                <button type="button" class="btn btn-primary btn-full" @onclick="Submit" disabled="@isLoading">
+                    @(isLoading ? "Signing in..." : "Sign In")
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error mt-3">@errorMessage</div>
+            }
+
+            <div class="auth-divider">or</div>
+
+            <p class="auth-link-text">Don't have an account? <a href="/register" class="auth-link">Register</a></p>
+        </div>
+    </div>
+}
+
+@code {
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string? errorMessage;
+    private bool isLoading;
+
+    protected override void OnInitialized()
+    {
+        State.OnChange += OnAuthStateChanged;
+
+        if (State.IsLoggedIn)
+        {
+            Nav.NavigateTo("/", forceLoad: false);
+        }
+    }
+
+    private void OnAuthStateChanged()
+    {
+        if (State.IsLoggedIn)
+        {
+            InvokeAsync(() => Nav.NavigateTo("/", forceLoad: false));
+        }
+    }
+
+    public void Dispose()
+    {
+        State.OnChange -= OnAuthStateChanged;
+    }
+
+    private async Task Submit()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "Email and password are required.";
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            var result = await Api.LoginAsync(new Pefi.Bank.Shared.Commands.LoginCommand(email, password));
+            if (result is null)
+            {
+                errorMessage = "Invalid email or password.";
+                return;
+            }
+
+            State.SetAuth(result.CustomerId, result.Token, result.Email);
+            Nav.NavigateTo("/", forceLoad: false);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Sign in failed: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Pefi.Bank.Domain\Pefi.Bank.Domain.csproj" />
+    <ProjectReference Include="..\Pefi.Bank.Shared\Pefi.Bank.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

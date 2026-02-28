@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Aggregates;
+using Pefi.Bank.Infrastructure;
 using Pefi.Bank.Infrastructure.EventStore;
 
 namespace Pefi.Bank.Functions.Projections;
@@ -19,6 +21,12 @@ public class TransferSagaExecutor(
 
     public async Task HandleAsync(EventDocument doc)
     {
+        using var activity = DiagnosticConfig.Source.StartActivity("Saga.Execute");
+        activity?.SetTag("pefi.saga.step", doc.EventType);
+        activity?.SetTag("pefi.stream_id", doc.StreamId);
+
+        var stopwatch = Stopwatch.GetTimestamp();
+
         switch (doc.EventType)
         {
             case "TransferInitiated":
@@ -31,6 +39,10 @@ public class TransferSagaExecutor(
                 await RecordLedgerAndComplete(doc);
                 break;
         }
+
+        var elapsedMs = Stopwatch.GetElapsedTime(stopwatch).TotalMilliseconds;
+        DiagnosticConfig.SagaStepDuration.Record(elapsedMs,
+            new KeyValuePair<string, object?>("pefi.saga.step", doc.EventType));
     }
 
     // ── Saga Step 1: TransferInitiated -> Debit source account ──────────────
@@ -40,8 +52,15 @@ public class TransferSagaExecutor(
         var data = JsonSerializer.Deserialize<JsonElement>(doc.Data);
         var transferId = data.GetProperty("transferId").GetGuid();
         var sourceAccountId = data.GetProperty("sourceAccountId").GetGuid();
+        var destinationAccountId = data.GetProperty("destinationAccountId").GetGuid();
+
         var amount = data.GetProperty("amount").GetDecimal();
         var description = data.GetProperty("description").GetString()!;
+
+        logger.LogInformation("Saga:Transfer:DebitSource {TransferId} for source account {SourceAccountId}, to destination account {DestinationAccountId}",
+             transferId, 
+             sourceAccountId, 
+             destinationAccountId);
 
         var transfer = await transferRepo.LoadAsync(transferId);
 
@@ -56,7 +75,7 @@ public class TransferSagaExecutor(
         try
         {
             var source = await accountRepo.LoadAsync(sourceAccountId);
-            source.Withdraw(amount, $"Transfer to {data.GetProperty("destinationAccountId").GetGuid()}: {description}");
+            source.Withdraw(amount, $"Transfer to {destinationAccountId}: {description}");
             await accountRepo.SaveAsync(source);
 
             transfer.MarkSourceDebited();
@@ -66,7 +85,7 @@ public class TransferSagaExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Saga: Failed to debit source for transfer {TransferId}", transferId);
+            logger.LogWarning(ex, "Saga: Failed to debit source {sourceAccountId} for transfer {TransferId}", sourceAccountId, transferId);
 
             // Reload transfer in case state changed
             transfer = await transferRepo.LoadAsync(transferId);
@@ -74,6 +93,7 @@ public class TransferSagaExecutor(
             {
                 transfer.Fail($"Source debit failed: {ex.Message}");
                 await transferRepo.SaveAsync(transfer);
+                DiagnosticConfig.SagasFailed.Add(1);
             }
         }
     }
@@ -132,6 +152,7 @@ public class TransferSagaExecutor(
                 transfer.MarkSourceDebitCompensated();
                 transfer.Fail($"Destination credit failed: {ex.Message}");
                 await transferRepo.SaveAsync(transfer);
+                DiagnosticConfig.SagasFailed.Add(1);
             }
         }
     }
@@ -168,6 +189,7 @@ public class TransferSagaExecutor(
             transfer.Complete();
             await transferRepo.SaveAsync(transfer);
 
+            DiagnosticConfig.SagasCompleted.Add(1);
             logger.LogInformation("Saga: Transfer {TransferId} completed", transferId);
         }
         catch (Exception ex)

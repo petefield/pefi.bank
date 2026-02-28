@@ -1,7 +1,15 @@
+using HealthChecks.CosmosDb;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Pefi.Bank.Api;
 using Pefi.Bank.Api.Endpoints;
 using Pefi.Bank.Auth;
+using Pefi.Bank.Domain;
+using Pefi.Bank.Domain.Aggregates;
 using Pefi.Bank.Infrastructure;
+using Pefi.Bank.Shared;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,6 +46,40 @@ builder.Services.AddCors(options =>
     });
 });
 
+// ── OpenTelemetry ───────────────────────────────────────────────────────────
+var otlpEndpoint = builder.Configuration.GetValue<string>("OTEL_EXPORTER_OTLP_ENDPOINT")
+    ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
+    ?? "http://localhost:18889";
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(DiagnosticConfig.ServiceName, serviceInstanceId: "api"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddSource(DiagnosticConfig.ServiceName)
+        .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddMeter(DiagnosticConfig.ServiceName)
+        .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)));
+
+builder.Logging.AddOpenTelemetry(logging =>
+{
+    logging.IncludeScopes = true;
+    logging.IncludeFormattedMessage = true;
+    logging.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+});
+
+// ── Health Checks ───────────────────────────────────────────────────────────
+builder.Services.AddHealthChecks()
+    .AddAzureCosmosDB(
+        clientFactory: sp => sp.GetRequiredService<CosmosClientHolder>().Client,
+        optionsFactory: _ => new() { DatabaseId = databaseName },
+        name: "cosmosdb",
+        tags: ["ready"])
+    .AddRedis(redisConnection, name: "redis", tags: ["ready"]);
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -59,6 +101,20 @@ app.MapCustomerEndpoints();
 app.MapAccountEndpoints();
 app.MapTransferEndpoints();
 app.MapLedgerEndpoints();
+app.MapHealthChecks("/health");
+
+// Ensure settlement account exists
+using (var scope = app.Services.CreateScope())
+{
+    var settlementRepo = scope.ServiceProvider.GetRequiredService<IAggregateRepository<Account>>();
+    var existingSettlement = await settlementRepo.LoadAsync(WellKnownAccounts.SettlementAccountId);
+    if (existingSettlement.Version < 0)
+    {
+        var settlementAccount = Account.Open(WellKnownAccounts.SettlementAccountId, Guid.Empty, "Settlement Account",-1);
+        await settlementRepo.SaveAsync(settlementAccount);
+    }
+}
+
 
 app.Run();
 

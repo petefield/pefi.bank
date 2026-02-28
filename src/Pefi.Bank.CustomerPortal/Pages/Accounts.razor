@@ -11,7 +11,7 @@
     <div class="card" style="max-width: 400px;">
         <div class="empty-state">
             <div class="empty-state-title">Not signed in</div>
-            <div class="empty-state-text">Please <a href="">sign in</a> to view your accounts.</div>
+            <div class="empty-state-text">Please <a href="/signin">sign in</a> to view your accounts.</div>
         </div>
     </div>
 }
@@ -31,7 +31,7 @@ else
                 <label class="form-label">Account Name</label>
                 <input type="text" class="form-input" @bind="newAccountName" placeholder="e.g. Savings, Bills" />
             </div>
-            <button class="btn btn-primary" @onclick="OpenAccount" disabled="@isLoading" style="height: 42px;">
+            <button type="button" class="btn btn-primary" @onclick="OpenAccount" disabled="@isLoading" style="height: 42px;">
                 Open
             </button>
         </div>

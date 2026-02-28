@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Pefi.Bank.Infrastructure;
 
 namespace Pefi.Bank.Auth;
 
@@ -21,7 +22,7 @@ public static class ServiceCollectionExtensions
         // Register the user store with its own Cosmos container
         services.AddSingleton<IUserStore<ApplicationUser>>(sp =>
         {
-            var client = sp.GetRequiredService<CosmosClient>();
+            var client = sp.GetRequiredService<CosmosClientHolder>().Client;
             var container = client.GetContainer(databaseName, "users");
             return new CosmosUserStore(container);
         });

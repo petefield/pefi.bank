@@ -1,8 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Pefi.Bank.Domain.Messages;
-using Pefi.Bank.Functions.Extensions;
-using Pefi.Bank.Infrastructure.EventStore;
 using StackExchange.Redis;
 
 namespace Pefi.Bank.Functions.Projections;
@@ -11,18 +9,16 @@ public class EventNotificationPublisher(
     IConnectionMultiplexer redis,
     ILogger<EventNotificationPublisher> logger)
 {
-    public async Task PublishAsync(EventDocument doc)
+    public async Task PublishAsync( EntityStateChangedMessage msg, string channel)
     {
-        string channel = string.Empty;
         try
         {
             var subscriber = redis.GetSubscriber();
-            var (entityType, entityId) = doc.StreamId.ToEntityInfo();
-            channel = $"{entityType}-events";
 
-            var message = JsonSerializer.Serialize(new EntityStateChangedMessage { EntityId = entityId, State = doc.EventType });
-            await subscriber.PublishAsync(RedisChannel.Literal($"{entityType}-events"), message);
-            logger.LogInformation("Published state change: {EntityId} -> {State} on channel {Channel}", entityId, doc.EventType, channel);
+
+            var message = JsonSerializer.Serialize(msg);
+            await subscriber.PublishAsync(RedisChannel.Literal($"{channel}-events"), message);
+            logger.LogInformation("Published state change: {EntityId} -> {State} on channel {Channel}", msg.EntityId, msg.State, channel);
         }
         catch (Exception ex)
         {

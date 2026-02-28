@@ -1,15 +1,17 @@
 namespace Pefi.Bank.Shared.ReadModels;
 
-public sealed class TransferReadModel
+public  record TransferReadModel(
+    Guid Id,
+    Guid SourceAccountId,
+    Guid DestinationAccountId,
+    decimal Amount,
+    string Description,
+    string Status,
+    string? FailureReason,
+    DateTime InitiatedAt,
+    DateTime UpdatedAt,
+    DateTime? CompletedAt)
 {
-    public Guid Id { get; set; }
     public string PartitionKey { get; set; } = "transfer";
-    public Guid SourceAccountId { get; set; }
-    public Guid DestinationAccountId { get; set; }
-    public decimal Amount { get; set; }
-    public string Description { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-    public string? FailureReason { get; set; }
-    public DateTime InitiatedAt { get; set; }
-    public DateTime? CompletedAt { get; set; }
+
 }

@@ -1,5 +1,5 @@
-using System.Text.Json;
-using Pefi.Bank.Infrastructure.EventStore;
+using Pefi.Bank.Domain;
+using Pefi.Bank.Domain.Events;
 using Pefi.Bank.Infrastructure.ReadStore;
 using Pefi.Bank.Shared.ReadModels;
 
@@ -9,7 +9,6 @@ public class TransferProjectionHandler(
     IReadStore readStore,
     EventNotificationPublisher notificationPublisher) : IProjectionHandler
 {
-    private static readonly HashSet<string> NotifiableEvents = ["TransferCompleted", "TransferFailed"];
 
     private static readonly HashSet<string> HandledEvents =
     [
@@ -19,72 +18,70 @@ public class TransferProjectionHandler(
 
     public bool CanHandle(string eventType) => HandledEvents.Contains(eventType);
 
-    public async Task HandleAsync(EventDocument doc)
+
+    public async Task HandleAsync(DomainEvent @event)
     {
-        var data = JsonSerializer.Deserialize<JsonElement>(doc.Data);
-        var transferId = data.GetProperty("transferId").GetGuid();
-
-        switch (doc.EventType)
+        await (@event switch
         {
-            case "TransferInitiated":
-                var model = new TransferReadModel
-                {
-                    Id = transferId,
-                    SourceAccountId = data.GetProperty("sourceAccountId").GetGuid(),
-                    DestinationAccountId = data.GetProperty("destinationAccountId").GetGuid(),
-                    Amount = data.GetProperty("amount").GetDecimal(),
-                    Description = data.GetProperty("description").GetString()!,
-                    Status = "Initiated",
-                    InitiatedAt = doc.Timestamp
-                };
-                await readStore.UpsertAsync(model, "transfer");
-                break;
-
-            case "TransferSourceDebited":
-                await UpdateTransferStatus(transferId, "SourceDebited");
-                break;
-
-            case "TransferDestinationCredited":
-                await UpdateTransferStatus(transferId, "DestinationCredited");
-                break;
-
-            case "TransferSourceDebitCompensated":
-                await UpdateTransferStatus(transferId, "SourceDebitCompensated");
-                break;
-
-            case "TransferCompleted":
-                var completed = await readStore.GetAsync<TransferReadModel>(transferId.ToString(), "transfer");
-                if (completed is not null)
-                {
-                    completed.Status = "Completed";
-                    completed.CompletedAt = doc.Timestamp;
-                    await readStore.UpsertAsync(completed, "transfer");
-                }
-                break;
-
-            case "TransferFailed":
-                var failed = await readStore.GetAsync<TransferReadModel>(transferId.ToString(), "transfer");
-                if (failed is not null)
-                {
-                    failed.Status = "Failed";
-                    failed.FailureReason = data.GetProperty("reason").GetString();
-                    failed.CompletedAt = doc.Timestamp;
-                    await readStore.UpsertAsync(failed, "transfer");
-                }
-                break;
-        }
-
-        if (NotifiableEvents.Contains(doc.EventType))
-            await notificationPublisher.PublishAsync(doc);
+            TransferInitiated e => HandleInitiatedAsync(e), 
+            TransferSourceDebited e => UpdateTransferStatus(e.TransferId, "SourceDebited", e.OccurredAt),
+            TransferDestinationCredited e => UpdateTransferStatus(e.TransferId, "DestinationCredited", e.OccurredAt),
+            TransferSourceDebitCompensated e => UpdateTransferStatus(e.TransferId, "SourceDebitCompensated", e.OccurredAt),
+            TransferCompleted e => UpdateTransferStatus(e.TransferId, "Completed", e.OccurredAt),
+            TransferFailed e => HandleFailedAsync(e),
+            _ => Task.CompletedTask
+        });
     }
 
-    private async Task UpdateTransferStatus(Guid transferId, string status)
+    public async Task HandleInitiatedAsync(TransferInitiated @event)
+    {
+        var model = new TransferReadModel(        
+            Id: @event.TransferId,
+            SourceAccountId: @event.SourceAccountId,
+            DestinationAccountId: @event.DestinationAccountId,
+            Amount: @event.Amount,
+            Description: @event.Description,
+            Status: "Initiated",
+            FailureReason: null,
+            InitiatedAt: @event.OccurredAt,
+            UpdatedAt: @event.OccurredAt,
+            CompletedAt: null
+        );
+
+        await readStore.UpsertAsync(model, "transfer");
+        await notificationPublisher.PublishAsync(new (@event.TransferId.ToString(), @event.EventType), model.PartitionKey);
+
+    }
+
+    public async Task HandleFailedAsync(TransferFailed @event)
+    {
+        var existing = await readStore.GetAsync<TransferReadModel>(@event.TransferId.ToString(), "transfer");
+
+        if (existing is null)
+            return;
+        
+        await readStore.UpsertAsync(existing with {
+            Status = "Failed", 
+            FailureReason = @event.Reason, 
+            CompletedAt = @event.OccurredAt }, existing.PartitionKey);
+        
+        await notificationPublisher.PublishAsync(new (@event.TransferId.ToString(), @event.EventType), existing.PartitionKey);
+
+    }
+
+    private async Task UpdateTransferStatus(Guid transferId, string status, DateTime timestamp)
     {
         var existing = await readStore.GetAsync<TransferReadModel>(transferId.ToString(), "transfer");
-        if (existing is not null)
-        {
-            existing.Status = status;
-            await readStore.UpsertAsync(existing, "transfer");
-        }
+
+        if (existing is  null)
+            return;     
+        
+        await readStore.UpsertAsync(existing with { 
+            Status = status,
+            UpdatedAt = timestamp
+        }, existing.PartitionKey);
+
+        await notificationPublisher.PublishAsync(new (transferId.ToString(), "TransferStatusUpdated"), existing.PartitionKey);
+
     }
 }

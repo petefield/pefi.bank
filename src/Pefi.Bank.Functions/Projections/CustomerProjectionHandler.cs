@@ -1,5 +1,5 @@
-using System.Text.Json;
-using Pefi.Bank.Infrastructure.EventStore;
+using Pefi.Bank.Domain;
+using Pefi.Bank.Domain.Events;
 using Pefi.Bank.Infrastructure.ReadStore;
 using Pefi.Bank.Shared.ReadModels;
 
@@ -9,55 +9,58 @@ public class CustomerProjectionHandler(
     IReadStore readStore,
     EventNotificationPublisher notificationPublisher) : IProjectionHandler
 {
-    private static readonly HashSet<string> HandledEvents = ["CustomerCreated", "CustomerUpdated"];
+
+    private static readonly HashSet<string> HandledEvents = [nameof(CustomerCreated), nameof(CustomerUpdated)];
 
     public bool CanHandle(string eventType) => HandledEvents.Contains(eventType);
 
-    public async Task HandleAsync(EventDocument doc)
+    public async Task HandleAsync(DomainEvent @event)
     {
-        switch (doc.EventType)
-        {
-            case "CustomerCreated":
-                await ProjectCustomerCreated(doc);
-                break;
-            case "CustomerUpdated":
-                await ProjectCustomerUpdated(doc);
-                break;
-        }
 
-        await notificationPublisher.PublishAsync(doc);
+        await (@event switch
+        {
+            CustomerCreated e => HandleCustomerCreated(e),
+            CustomerUpdated e => HandleCustomerUpdated(e),
+            _ => throw new InvalidOperationException($"Unsupported event type: {@event.GetType().Name}")
+        });
     }
 
-    private async Task ProjectCustomerCreated(EventDocument doc)
+    private async Task HandleCustomerCreated(CustomerCreated evt)
     {
-        var data = JsonSerializer.Deserialize<JsonElement>(doc.Data);
+        
         var model = new CustomerReadModel
         {
-            Id = data.GetProperty("customerId").GetGuid(),
-            FirstName = data.GetProperty("firstName").GetString()!,
-            LastName = data.GetProperty("lastName").GetString()!,
-            Email = data.GetProperty("email").GetString()!,
+            Id = evt.CustomerId,
+            FirstName = evt.FirstName,
+            LastName = evt.LastName,
+            Email = evt.Email,
             AccountCount = 0,
-            CreatedAt = doc.Timestamp,
-            UpdatedAt = doc.Timestamp
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        await readStore.UpsertAsync(model, "customer");
+        await readStore.UpsertAsync(model, model.PartitionKey);
+        await notificationPublisher.PublishAsync(new ( evt.CustomerId.ToString(),  evt.EventType), model.PartitionKey);
+
     }
 
-    private async Task ProjectCustomerUpdated(EventDocument doc)
+    private async Task HandleCustomerUpdated(CustomerUpdated? evt)
     {
-        var data = JsonSerializer.Deserialize<JsonElement>(doc.Data);
-        var customerId = data.GetProperty("customerId").GetGuid();
+        ArgumentNullException.ThrowIfNull(evt);
 
-        var existing = await readStore.GetAsync<CustomerReadModel>(customerId.ToString(), "customer");
-        if (existing is null) return;
+        var existing = await readStore.GetAsync<CustomerReadModel>(evt.CustomerId.ToString(),  "customer");
+        
+        if (existing is null) 
+            return;
 
-        existing.FirstName = data.GetProperty("firstName").GetString()!;
-        existing.LastName = data.GetProperty("lastName").GetString()!;
-        existing.Email = data.GetProperty("email").GetString()!;
-        existing.UpdatedAt = doc.Timestamp;
+        var customerReadModel = existing with
+        {
+            FirstName = evt.FirstName,
+            LastName = evt.LastName,
+            Email = evt.Email
+        };
 
-        await readStore.UpsertAsync(existing, "customer");
+        await readStore.UpsertAsync(customerReadModel, existing.PartitionKey);
+        await notificationPublisher.PublishAsync(new ( evt.CustomerId.ToString(), evt.EventType), existing.PartitionKey);
     }
 }

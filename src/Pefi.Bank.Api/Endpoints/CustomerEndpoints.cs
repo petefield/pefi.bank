@@ -1,10 +1,8 @@
 using System.Security.Claims;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Aggregates;
-using Pefi.Bank.Infrastructure.ReadStore;
 using Pefi.Bank.Shared.Commands;
-using Pefi.Bank.Shared.ReadModels;
-using Microsoft.Azure.Cosmos;
+using Pefi.Bank.Shared.Queries;
 using StackExchange.Redis;
 using Pefi.Bank.Api.Extensions;
 
@@ -37,8 +35,7 @@ public static class CustomerEndpoints
     private static async Task<IResult> GetCustomer(
         Guid id,
         HttpContext context,
-        IReadStore readStore,
-        IAggregateRepository<Customer> repository)
+        ICustomerQueries customerQueries)
     {
         // Verify the authenticated user owns this customer ID
         var claim = context.User.FindFirst("customerId")
@@ -47,19 +44,9 @@ public static class CustomerEndpoints
         if (authCustomerId != id)
             return Results.Forbid();
 
-        var customerReadModel = await readStore.ReadWithFallBack("customer", id, repository, c => new CustomerReadModel
-        {
-            Id = c.Id,
-            FirstName = c.FirstName,
-            LastName = c.LastName,
-            Email = c.Email,
-            AccountCount = 0,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        }); 
-
-        return customerReadModel is not null
-            ? Results.Ok(customerReadModel)
+        var customer = await customerQueries.GetByIdAsync(id);
+        return customer is not null
+            ? Results.Ok(customer)
             : Results.NotFound();
     }
 
@@ -86,11 +73,9 @@ public static class CustomerEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> ListCustomers(IReadStore readStore)
+    private static async Task<IResult> ListCustomers(ICustomerQueries customerQueries)
     {
-        var customers = await readStore.QueryAsync<CustomerReadModel>(
-            new QueryDefinition("SELECT * FROM c WHERE c.partitionKey = 'customer'"));
-
+        var customers = await customerQueries.ListAllAsync();
         return Results.Ok(customers);
     }
 

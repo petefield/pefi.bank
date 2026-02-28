@@ -51,7 +51,7 @@ public class AccountTests
         var ex = Assert.Throws<DomainException>(() =>
             account.Withdraw(100m, "Too much"));
 
-        Assert.Equal("Insufficient funds.", ex.Message);
+        Assert.Equal("Withdrawal would exceed overdraft limit.", ex.Message);
     }
 
     [Fact]

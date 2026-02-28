@@ -1,11 +1,9 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Pefi.Bank.Domain;
+using Pefi.Bank.Shared;
 using Pefi.Bank.Domain.Aggregates;
-using Pefi.Bank.Infrastructure.ReadStore;
 using Pefi.Bank.Shared.Commands;
-using Pefi.Bank.Shared.ReadModels;
-using Microsoft.Azure.Cosmos;
+using Pefi.Bank.Shared.Queries;
 using StackExchange.Redis;
 using Pefi.Bank.Api.Extensions;
 
@@ -35,6 +33,8 @@ public static class AccountEndpoints
 
     private static Guid GetCustomerIdFromClaims(HttpContext context)
     {
+
+        
         var claim = context.User.FindFirst("customerId")
             ?? context.User.FindFirst(ClaimTypes.NameIdentifier);
         return Guid.Parse(claim!.Value);
@@ -51,106 +51,67 @@ public static class AccountEndpoints
         var account = Account.Open(accountId, customerId, command.AccountName);
         await repository.SaveAsync(account);
 
-        return Results.Accepted($"/accounts/{accountId}", new { id = accountId, eventsUrl = $"/accounts/{accountId}/events" });
+        return Results.Accepted($"/accounts/{accountId}", new { 
+            id = accountId, 
+            eventsUrl = $"/accounts/{accountId}/events" });
     }
 
     private static async Task<IResult> GetAccount(
         Guid id,
-        IReadStore readStore,
-        IAggregateRepository<Account> repository)
+        IAccountQueries accountQueries)
     {
-        var account = await readStore.GetAsync<AccountReadModel>(
-            id.ToString(), "account");
+        var account = await accountQueries.GetByIdAsync(id);
 
-        if (account is not null)
-            return Results.Ok(account);
-
-        // Fall back to event store when projection hasn't run yet
-        var aggregate = await repository.LoadAsync(id);
-        if (aggregate.Version < 0)
-            return Results.NotFound();
-
-        return Results.Ok(new AccountReadModel
-        {
-            Id = aggregate.Id,
-            CustomerId = aggregate.CustomerId,
-            AccountName = aggregate.AccountName,
-            AccountNumber = aggregate.AccountNumber,
-            SortCode = aggregate.SortCode,
-            Balance = aggregate.Balance,
-            IsClosed = aggregate.IsClosed,
-            OpenedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        });
+        return account is not null
+            ? Results.Ok(account)
+            : Results.NotFound();
     }
 
     private static async Task<IResult> Deposit(
         Guid id,
         DepositCommand command,
-        IAggregateRepository<Account> accountRepo,
-        IAggregateRepository<SettlementAccount> settlementRepo,
-        IAggregateRepository<LedgerTransaction> ledgerRepo)
+        IAggregateRepository<Transfer> transferRepo)
     {
-        var account = await accountRepo.LoadAsync(id);
-        if (account.Version < 0)
-            return Results.NotFound();
+        var transferId = Guid.NewGuid();
 
-        account.Deposit(command.Amount, command.Description);
-        await accountRepo.SaveAsync(account);
-
-        // Double-entry: debit settlement (money enters the bank)
-        var settlement = await settlementRepo.LoadAsync(SettlementAccount.WellKnownId);
-        if (settlement.Version < 0)
-            settlement = SettlementAccount.Create();
-        settlement.Debit(command.Amount, command.Description);
-        await settlementRepo.SaveAsync(settlement);
-
-        // Record ledger transaction: DR Settlement, CR Customer Account
-        var ledger = LedgerTransaction.Record(
-            Guid.NewGuid(),
-            "Deposit",
-            SettlementAccount.WellKnownId,
+        // Create the transfer — saga will handle the rest via change feed
+        var transfer = Transfer.Initiate(
+            transferId,
+            WellKnownAccounts.SettlementAccountId,
             id,
             command.Amount,
             command.Description);
-        await ledgerRepo.SaveAsync(ledger);
 
-        return Results.NoContent();
+        await transferRepo.SaveAsync(transfer);
+
+        return Results.Accepted($"/transfers/{transferId}", new { 
+            id = transferId, 
+            eventsUrl = $"/transfers/{transferId}/events" });
     }
 
     private static async Task<IResult> Withdraw(
         Guid id,
         WithdrawCommand command,
-        IAggregateRepository<Account> accountRepo,
-        IAggregateRepository<SettlementAccount> settlementRepo,
-        IAggregateRepository<LedgerTransaction> ledgerRepo)
+        IAggregateRepository<Transfer> transferRepo)
     {
-        var account = await accountRepo.LoadAsync(id);
-        if (account.Version < 0)
-            return Results.NotFound();
+        var transferId = Guid.NewGuid();
 
-        account.Withdraw(command.Amount, command.Description);
-        await accountRepo.SaveAsync(account);
-
-        // Double-entry: credit settlement (money leaves the bank)
-        var settlement = await settlementRepo.LoadAsync(SettlementAccount.WellKnownId);
-        if (settlement.Version < 0)
-            settlement = SettlementAccount.Create();
-        settlement.Credit(command.Amount, command.Description);
-        await settlementRepo.SaveAsync(settlement);
-
-        // Record ledger transaction: DR Customer Account, CR Settlement
-        var ledger = LedgerTransaction.Record(
-            Guid.NewGuid(),
-            "Withdrawal",
+        // Create the transfer — saga will handle the rest via change feed
+        var transfer = Transfer.Initiate(
+            transferId,
             id,
-            SettlementAccount.WellKnownId,
+            WellKnownAccounts.SettlementAccountId,
             command.Amount,
             command.Description);
-        await ledgerRepo.SaveAsync(ledger);
 
-        return Results.NoContent();
+        await transferRepo.SaveAsync(transfer);
+
+        return Results.Accepted($"/transfers/{transferId}", new { 
+            id = transferId, 
+            eventsUrl = $"/transfers/{transferId}/events" });
     }
+
+
 
     private static async Task<IResult> CloseAccount(
         Guid id,
@@ -168,39 +129,29 @@ public static class AccountEndpoints
 
     private static async Task<IResult> GetTransactions(
         Guid id,
-        IReadStore readStore)
+        ITransactionQueries transactionQueries)
     {
-        var transactions = await readStore.QueryAsync<TransactionReadModel>(
-            new QueryDefinition(
-                "SELECT * FROM c WHERE c.accountId = @accountId AND c.partitionKey = 'transaction' ORDER BY c.occurredAt DESC")
-                .WithParameter("@accountId", id.ToString()));
-
+        var transactions = await transactionQueries.GetByAccountIdAsync(id);
         return Results.Ok(transactions);
     }
 
     private static async Task<IResult> GetCustomerAccounts(
         Guid customerId,
         HttpContext context,
-        IReadStore readStore)
+        IAccountQueries accountQueries)
     {
         // Verify the authenticated user owns this customer ID
         var authCustomerId = GetCustomerIdFromClaims(context);
         if (authCustomerId != customerId)
             return Results.Forbid();
 
-        var accounts = await readStore.QueryAsync<AccountReadModel>(
-            new QueryDefinition(
-                "SELECT * FROM c WHERE c.customerId = @customerId AND c.partitionKey = 'account'")
-                .WithParameter("@customerId", customerId.ToString()));
-
+        var accounts = await accountQueries.GetByCustomerIdAsync(customerId);
         return Results.Ok(accounts);
     }
 
-    private static async Task<IResult> ListAccounts(IReadStore readStore)
+    private static async Task<IResult> ListAccounts(IAccountQueries accountQueries)
     {
-        var accounts = await readStore.QueryAsync<AccountReadModel>(
-            new QueryDefinition("SELECT * FROM c WHERE c.partitionKey = 'account'"));
-
+        var accounts = await accountQueries.ListAllAsync();
         return Results.Ok(accounts);
     }
 

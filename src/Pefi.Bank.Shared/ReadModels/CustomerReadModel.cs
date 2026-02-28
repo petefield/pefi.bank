@@ -1,6 +1,6 @@
 namespace Pefi.Bank.Shared.ReadModels;
 
-public sealed class CustomerReadModel
+public record class CustomerReadModel
 {
     public Guid Id { get; set; }
     public string PartitionKey { get; set; } = "customer";

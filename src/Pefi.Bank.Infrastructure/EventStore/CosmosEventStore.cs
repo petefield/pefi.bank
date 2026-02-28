@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Azure.Cosmos;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Exceptions;
@@ -9,6 +10,9 @@ public class CosmosEventStore(Container container) : IEventStore
 {
     public async Task<IReadOnlyList<IEvent>> LoadEventsAsync(string streamId, CancellationToken ct = default)
     {
+        using var activity = DiagnosticConfig.Source.StartActivity("EventStore.LoadStream");
+        activity?.SetTag("pefi.stream_id", streamId);
+
         var query = new QueryDefinition(
             "SELECT * FROM c WHERE c.streamId = @streamId ORDER BY c.version")
             .WithParameter("@streamId", streamId);
@@ -25,6 +29,7 @@ public class CosmosEventStore(Container container) : IEventStore
             }
         }
 
+        activity?.SetTag("pefi.event_count", events.Count);
         return events.AsReadOnly();
     }
 
@@ -34,6 +39,12 @@ public class CosmosEventStore(Container container) : IEventStore
         int expectedVersion,
         CancellationToken ct = default)
     {
+        using var activity = DiagnosticConfig.Source.StartActivity("EventStore.AppendEvents");
+        activity?.SetTag("pefi.stream_id", streamId);
+        activity?.SetTag("pefi.event_count", events.Count);
+        activity?.SetTag("pefi.expected_version", expectedVersion);
+        activity?.SetTag("pefi.event_types", events.Select(e => e.EventType).Aggregate((a, b) => $"{a},{b}"));
+
         // Check current version for optimistic concurrency
         var currentVersion = await GetStreamVersionAsync(streamId, ct);
         if (currentVersion != expectedVersion)
@@ -53,7 +64,9 @@ public class CosmosEventStore(Container container) : IEventStore
                 EventType = @event.EventType,
                 Version = version,
                 Data = EventSerializer.Serialize(@event),
-                Timestamp = @event.OccurredAt
+                Timestamp = @event.OccurredAt,
+                TraceId = Activity.Current?.TraceId.ToString(),
+                SpanId = Activity.Current?.SpanId.ToString()
             };
 
             batch.CreateItem(document);
@@ -61,7 +74,13 @@ public class CosmosEventStore(Container container) : IEventStore
 
         var result = await batch.ExecuteAsync(ct);
         if (!result.IsSuccessStatusCode)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, $"Batch failed: {result.StatusCode}");
             throw new InvalidOperationException($"Failed to append events to stream '{streamId}'. Status: {result.StatusCode}");
+        }
+
+        DiagnosticConfig.EventsStored.Add(events.Count,
+            new KeyValuePair<string, object?>("pefi.stream_id", streamId));
     }
 
     private async Task<int> GetStreamVersionAsync(string streamId, CancellationToken ct)

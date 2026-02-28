@@ -10,7 +10,7 @@
     <div class="card" style="max-width: 400px;">
         <div class="empty-state">
             <div class="empty-state-title">Not signed in</div>
-            <div class="empty-state-text">Please <a href="">sign in</a> to view account details.</div>
+            <div class="empty-state-text">Please <a href="/signin">sign in</a> to view account details.</div>
         </div>
     </div>
 }
@@ -62,7 +62,7 @@ else
                 <label class="form-label">Description</label>
                 <input type="text" class="form-input" @bind="depositDescription" placeholder="e.g. Salary" />
             </div>
-            <button class="btn btn-success btn-full" @onclick="Deposit" disabled="@isLoading">Deposit</button>
+            <button type="button" class="btn btn-success btn-full" @onclick="Deposit" disabled="@isLoading">Deposit</button>
         </div>
 
         <div class="card card-flat" style="border: 1px solid var(--card-border);">
@@ -82,7 +82,7 @@ else
                 <label class="form-label">Description</label>
                 <input type="text" class="form-input" @bind="withdrawDescription" placeholder="e.g. Rent payment" />
             </div>
-            <button class="btn btn-warning btn-full" @onclick="Withdraw" disabled="@isLoading">Withdraw</button>
+            <button type="button" class="btn btn-warning btn-full" @onclick="Withdraw" disabled="@isLoading">Withdraw</button>
         </div>
     </div>
 
@@ -233,31 +233,31 @@ else
         }
     }
 
-    private static string GetTxIconClass(string type) => type switch
+    private static string GetTxIconClass(TransactionType type) => type switch
     {
-        "Deposit" => "tx-icon-deposit",
-        "Withdrawal" => "tx-icon-withdrawal",
+        TransactionType.Credit => "tx-icon-deposit",
+        TransactionType.Debit => "tx-icon-withdrawal",
         _ => "tx-icon-transfer"
     };
 
-    private static string GetTxIconSvg(string type) => type switch
+    private static string GetTxIconSvg(TransactionType type) => type switch
     {
-        "Deposit" => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>""",
-        "Withdrawal" => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8z"/></svg>""",
+        TransactionType.Credit => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>""",
+        TransactionType.Debit => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8z"/></svg>""",
         _ => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>"""
     };
 
-    private static string GetTxAmountClass(string type) => type switch
+    private static string GetTxAmountClass(TransactionType type) => type switch
     {
-        "Deposit" => "tx-amount-positive",
-        "Withdrawal" => "tx-amount-negative",
+        TransactionType.Credit => "tx-amount-positive",
+        TransactionType.Debit => "tx-amount-negative",
         _ => "tx-amount-neutral"
     };
 
-    private static string GetTxAmountPrefix(string type) => type switch
+    private static string GetTxAmountPrefix(TransactionType type) => type switch
     {
-        "Deposit" => "+",
-        "Withdrawal" => "-",
+        TransactionType.Credit => "+",
+        TransactionType.Debit => "-",
         _ => ""
     };
 }

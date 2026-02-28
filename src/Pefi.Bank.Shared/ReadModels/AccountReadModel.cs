@@ -1,15 +1,20 @@
 namespace Pefi.Bank.Shared.ReadModels;
 
-public sealed class AccountReadModel
+
+
+public record AccountReadModel(
+    Guid Id,
+    Guid CustomerId,
+    string AccountName,
+    string AccountNumber,
+    string SortCode,
+    decimal Balance,
+    bool IsClosed,
+    DateTime OpenedAt,
+    DateTime UpdatedAt,
+    decimal OverdraftLimit)
 {
-    public Guid Id { get; set; }
-    public string PartitionKey { get; set; } = "account";
-    public Guid CustomerId { get; set; }
-    public string AccountName { get; set; } = string.Empty;
-    public string AccountNumber { get; set; } = string.Empty;
-    public string SortCode { get; set; } = string.Empty;
-    public decimal Balance { get; set; }
-    public bool IsClosed { get; set; }
-    public DateTime OpenedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public string PartitionKey { get;  } = "account";
+
+    public decimal Balance { get; set; } = Balance;
 }

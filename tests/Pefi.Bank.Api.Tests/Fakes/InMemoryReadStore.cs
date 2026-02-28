@@ -53,4 +53,18 @@ public sealed class InMemoryReadStore : IReadStore
     {
         _items[Key(id, partitionKey)] = item;
     }
+
+    /// <summary>
+    /// Returns all items of the given type within a partition key.
+    /// Used by in-memory query service fakes for filtered queries.
+    /// </summary>
+    public Task<IReadOnlyList<T>> GetAllOfType<T>(string partitionKey) where T : class
+    {
+        var results = _items
+            .Where(kvp => kvp.Key.StartsWith($"{partitionKey}:"))
+            .Select(kvp => kvp.Value)
+            .OfType<T>()
+            .ToList();
+        return Task.FromResult<IReadOnlyList<T>>(results.AsReadOnly());
+    }
 }

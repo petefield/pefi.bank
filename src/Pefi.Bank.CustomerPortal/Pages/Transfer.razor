@@ -10,7 +10,7 @@
     <div class="card" style="max-width: 400px;">
         <div class="empty-state">
             <div class="empty-state-title">Not signed in</div>
-            <div class="empty-state-text">Please <a href="">sign in</a> to make transfers.</div>
+            <div class="empty-state-text">Please <a href="/signin">sign in</a> to make transfers.</div>
         </div>
     </div>
 }
@@ -87,7 +87,7 @@ else
             <input type="text" class="form-input" @bind="description" placeholder="What's this transfer for?" />
         </div>
 
-        <button class="btn btn-primary btn-full mt-3" @onclick="SubmitTransfer" disabled="@isLoading">
+        <button type="button" class="btn btn-primary btn-full mt-3" @onclick="SubmitTransfer" disabled="@isLoading">
             @(isLoading ? "Processing..." : "Transfer")
         </button>
     </div>

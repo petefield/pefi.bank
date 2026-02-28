@@ -24,4 +24,10 @@ public class EventDocument
 
     [JsonPropertyName("type")]
     public string Type { get; set; } = "event";
+
+    [JsonPropertyName("traceId")]
+    public string? TraceId { get; set; }
+
+    [JsonPropertyName("spanId")]
+    public string? SpanId { get; set; }
 }

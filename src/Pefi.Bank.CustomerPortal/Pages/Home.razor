@@ -1,72 +1,11 @@
 @page "/"
 @inject BankApiClient Api
 @inject CustomerState State
+@inject NavigationManager Nav
 
 @if (!State.IsLoggedIn)
 {
-    <div class="auth-container">
-        <div class="auth-card">
-            <div class="auth-brand">
-                <div class="auth-brand-icon">
-                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2L3 7v2h18V7L12 2zm0 2.18L17.36 7H6.64L12 4.18zM5 11v6c0 .55.45 1 1 1h3v-8H5zm5 0v8h4v-8h-4zm5 0v8h3c.55 0 1-.45 1-1v-6h-4zM3 20v2h18v-2H3z"/>
-                    </svg>
-                </div>
-                <div class="auth-brand-title">Welcome to Pefi Bank</div>
-                <div class="auth-brand-subtitle">Your modern banking experience</div>
-            </div>
-
-            <div class="card">
-                <h4 class="section-title mb-3">Sign In</h4>
-                <div class="form-group">
-                    <label class="form-label">Email</label>
-                    <input type="email" class="form-input" @bind="loginEmail" placeholder="you@example.com" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Password</label>
-                    <input type="password" class="form-input" @bind="loginPassword" placeholder="Enter your password" />
-                </div>
-                <button class="btn btn-primary btn-full" @onclick="SignIn" disabled="@isLoading">
-                    @(isLoading ? "Signing in..." : "Sign In")
-                </button>
-            </div>
-
-            <div class="auth-divider">or</div>
-
-            <div class="card">
-                <h4 class="section-title mb-3">Create Account</h4>
-                <div class="form-group">
-                    <label class="form-label">First Name</label>
-                    <input type="text" class="form-input" @bind="firstName" placeholder="Enter your first name" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Last Name</label>
-                    <input type="text" class="form-input" @bind="lastName" placeholder="Enter your last name" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Email</label>
-                    <input type="email" class="form-input" @bind="registerEmail" placeholder="you@example.com" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Password</label>
-                    <input type="password" class="form-input" @bind="registerPassword" placeholder="At least 6 characters" />
-                </div>
-                <button class="btn btn-primary btn-full" @onclick="Register" disabled="@isLoading">
-                    @(isLoading ? "Creating..." : "Register")
-                </button>
-            </div>
-
-            @if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <div class="alert alert-error mt-3">@errorMessage</div>
-            }
-
-            @if (!string.IsNullOrEmpty(successMessage))
-            {
-                <div class="alert alert-success mt-3">@successMessage</div>
-            }
-        </div>
-    </div>
+    <p>Redirecting...</p>
 }
 else
 {
@@ -104,7 +43,6 @@ else
         <div class="actions-row">
             <a href="accounts" class="btn btn-primary">View Accounts</a>
             <a href="transfer" class="btn btn-outline">Make Transfer</a>
-            <button class="btn btn-outline" @onclick="SignOut">Sign Out</button>
         </div>
     }
     else if (isLoading)
@@ -117,97 +55,23 @@ else
 }
 
 @code {
-    private string loginEmail = string.Empty;
-    private string loginPassword = string.Empty;
-    private string firstName = string.Empty;
-    private string lastName = string.Empty;
-    private string registerEmail = string.Empty;
-    private string registerPassword = string.Empty;
-    private string? errorMessage;
-    private string? successMessage;
     private bool isLoading;
     private CustomerReadModel? customer;
 
     protected override async Task OnInitializedAsync()
     {
-        if (State.IsLoggedIn)
+        if (!State.IsLoggedIn)
         {
-            await LoadCustomer();
-        }
-    }
-
-    private async Task SignIn()
-    {
-        errorMessage = null;
-        successMessage = null;
-
-        if (string.IsNullOrWhiteSpace(loginEmail) || string.IsNullOrWhiteSpace(loginPassword))
-        {
-            errorMessage = "Email and password are required.";
+            Nav.NavigateTo("/signin", forceLoad: false);
             return;
         }
 
-        isLoading = true;
-        try
-        {
-            var result = await Api.LoginAsync(new Pefi.Bank.Shared.Commands.LoginCommand(loginEmail, loginPassword));
-            if (result is null)
-            {
-                errorMessage = "Invalid email or password.";
-                return;
-            }
-
-            State.SetAuth(result.CustomerId, result.Token, result.Email);
-            await LoadCustomer();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Sign in failed: {ex.Message}";
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
-
-    private async Task Register()
-    {
-        errorMessage = null;
-        successMessage = null;
-
-        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName) ||
-            string.IsNullOrWhiteSpace(registerEmail) || string.IsNullOrWhiteSpace(registerPassword))
-        {
-            errorMessage = "All fields are required.";
-            return;
-        }
-
-        isLoading = true;
-        try
-        {
-            var result = await Api.RegisterAsync(
-                new Pefi.Bank.Shared.Commands.RegisterCommand(firstName, lastName, registerEmail, registerPassword));
-
-            State.SetAuth(result.CustomerId, result.Token, result.Email);
-            successMessage = "Account created successfully!";
-            firstName = string.Empty;
-            lastName = string.Empty;
-            registerEmail = string.Empty;
-            registerPassword = string.Empty;
-            await LoadCustomer();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Registration failed: {ex.Message}";
-        }
-        finally
-        {
-            isLoading = false;
-        }
+        await LoadCustomer();
     }
 
     private async Task LoadCustomer()
     {
+        isLoading = true;
         try
         {
             customer = await Api.GetCustomerAsync(State.CustomerId!.Value);
@@ -216,13 +80,9 @@ else
         {
             // Customer projection may not be ready yet — show dashboard without profile
         }
-    }
-
-    private void SignOut()
-    {
-        State.Clear();
-        customer = null;
-        errorMessage = null;
-        successMessage = null;
+        finally
+        {
+            isLoading = false;
+        }
     }
 }

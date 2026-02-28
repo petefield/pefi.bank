@@ -1,53 +1,52 @@
-using System.Text.Json;
-using Pefi.Bank.Infrastructure.EventStore;
+using Pefi.Bank.Domain;
+using Pefi.Bank.Domain.Events;
 using Pefi.Bank.Infrastructure.ReadStore;
 using Pefi.Bank.Shared.ReadModels;
 
 namespace Pefi.Bank.Functions.Projections;
 
-public class LedgerProjectionHandler(
-    IReadStore readStore) : IProjectionHandler
+public class LedgerProjectionHandler(IReadStore readStore) : IProjectionHandler
 {
-    public bool CanHandle(string eventType) => eventType == "LedgerTransactionRecorded";
+    public bool CanHandle(string eventType) => eventType == nameof(LedgerTransactionRecorded);
 
-    public async Task HandleAsync(EventDocument doc)
+    public async Task HandleAsync(DomainEvent @event)
     {
-        var data = JsonSerializer.Deserialize<JsonElement>(doc.Data);
-        var transactionId = data.GetProperty("transactionId").GetGuid();
-        var transactionType = data.GetProperty("transactionType").GetString()!;
-        var debitAccountId = data.GetProperty("debitAccountId").GetGuid();
-        var creditAccountId = data.GetProperty("creditAccountId").GetGuid();
-        var amount = data.GetProperty("amount").GetDecimal();
-        var description = data.GetProperty("description").GetString()!;
-        var debitEntryId = data.GetProperty("debitEntryId").GetGuid();
-        var creditEntryId = data.GetProperty("creditEntryId").GetGuid();
+        await (@event switch
+        {
+            LedgerTransactionRecorded e => HandleTransactionRecordedAsync(e),
+            _ => Task.CompletedTask
+        });
+    }
+
+    private async Task HandleTransactionRecordedAsync(LedgerTransactionRecorded e)
+    {
 
         // Create debit entry
         var debitEntry = new LedgerEntryReadModel
         {
-            Id = debitEntryId,
-            TransactionId = transactionId,
-            AccountId = debitAccountId,
+            Id = e.DebitEntryId,
+            TransactionId = e.TransactionId,
+            AccountId = e.DebitAccountId,
             EntryType = "Debit",
-            Amount = amount,
-            Description = description,
-            TransactionType = transactionType,
-            CreatedAt = doc.Timestamp
+            Amount = e.Amount,
+            Description = e.Description,
+            TransactionType = e.TransactionType,
+            CreatedAt = e.OccurredAt
         };
-        await readStore.UpsertAsync(debitEntry, "ledger");
+        await readStore.UpsertAsync(debitEntry, debitEntry.PartitionKey);
 
         // Create credit entry
         var creditEntry = new LedgerEntryReadModel
         {
-            Id = creditEntryId,
-            TransactionId = transactionId,
-            AccountId = creditAccountId,
+            Id = e.CreditEntryId,
+            TransactionId = e.TransactionId,
+            AccountId = e.CreditAccountId,
             EntryType = "Credit",
-            Amount = amount,
-            Description = description,
-            TransactionType = transactionType,
-            CreatedAt = doc.Timestamp
+            Amount = e.Amount,
+            Description = e.Description,
+            TransactionType = e.TransactionType,
+            CreatedAt = e.OccurredAt
         };
-        await readStore.UpsertAsync(creditEntry, "ledger");
+        await readStore.UpsertAsync(creditEntry, creditEntry.PartitionKey);
     }
 }

@@ -28,21 +28,18 @@ public static class EventSerializer
         [nameof(TransferSourceDebitCompensated)] = typeof(TransferSourceDebitCompensated),
         [nameof(TransferCompleted)] = typeof(TransferCompleted),
         [nameof(TransferFailed)] = typeof(TransferFailed),
-        [nameof(SettlementAccountCreated)] = typeof(SettlementAccountCreated),
-        [nameof(SettlementCredited)] = typeof(SettlementCredited),
-        [nameof(SettlementDebited)] = typeof(SettlementDebited),
         [nameof(LedgerTransactionRecorded)] = typeof(LedgerTransactionRecorded),
     };
 
     public static string Serialize(IEvent @event) =>
         JsonSerializer.Serialize(@event, @event.GetType(), Options);
 
-    public static IEvent Deserialize(string eventType, string json)
+    public static DomainEvent Deserialize(string eventType, string json)
     {
         if (!EventTypeMap.TryGetValue(eventType, out var type))
             throw new InvalidOperationException($"Unknown event type: {eventType}");
 
-        return (IEvent)(JsonSerializer.Deserialize(json, type, Options)
+        return (DomainEvent)(JsonSerializer.Deserialize(json, type, Options)
             ?? throw new InvalidOperationException($"Failed to deserialize event: {eventType}"));
     }
 

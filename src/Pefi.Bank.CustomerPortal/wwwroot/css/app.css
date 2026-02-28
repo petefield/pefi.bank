@@ -219,6 +219,24 @@ a:hover {
     text-overflow: ellipsis;
 }
 
+.sidebar-signout {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 8px 0;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+}
+
+.sidebar-signout:hover {
+    color: rgba(255, 255, 255, 0.85);
+}
+
 /* --- Main Content Area --- */
 .main-content {
     flex: 1;
@@ -780,6 +798,23 @@ a:hover {
     flex: 1;
     height: 1px;
     background: var(--card-border);
+}
+
+.auth-link-text {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.auth-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-link:hover {
+    text-decoration: underline;
 }
 
 /* --- Profile Card --- */

@@ -5,7 +5,8 @@ public sealed record AccountOpened(
     Guid CustomerId,
     string AccountName,
     string AccountNumber,
-    string SortCode) : DomainEvent;
+    string SortCode,
+    decimal OverdraftLimit) : DomainEvent;
 
 public sealed record FundsDeposited(
     Guid AccountId,
