@@ -52,16 +52,7 @@ public class EventProjectionFunction(
                 {
                     if (handler.CanHandle(doc.EventType))
                     {
-                        using var handlerActivity = DiagnosticConfig.Source.StartActivity("Projection.Handle");
-                        handlerActivity?.SetTag("pefi.handler", handler.GetType().Name);
-                        handlerActivity?.SetTag("pefi.event_type", doc.EventType);
-
-                        await handler.HandleAsync(@event);
-                        DiagnosticConfig.EventsProjected.Add(1,
-                            new KeyValuePair<string, object?>("pefi.event_type", doc.EventType),
-                            new KeyValuePair<string, object?>("pefi.handler", handler.GetType().Name));
-
-                        logger.LogInformation("Projected event {EventType} for stream {StreamId}", doc.EventType, doc.StreamId);
+                        await handler.HandleAsync(@event, doc);
                     }
                 }
 
@@ -70,18 +61,7 @@ public class EventProjectionFunction(
                 {
                     if (saga.CanHandle(doc.EventType))
                     {
-                        
-                        using var handlerActivity = DiagnosticConfig.Source.StartActivity("Saga.Handle");
-                        handlerActivity?.SetTag("pefi.handler", saga.GetType().Name);
-                        handlerActivity?.SetTag("pefi.event_type", doc.EventType);
                         await saga.HandleAsync(@event, doc);
-
-                        DiagnosticConfig.SagasStepsExecuted.Add(1,
-                            new KeyValuePair<string, object?>("pefi.event_type", doc.EventType),
-                            new KeyValuePair<string, object?>("pefi.handler", saga.GetType().Name));
-                        
-                        logger.LogInformation("Saga event {EventType} for stream {StreamId}", doc.EventType, doc.StreamId);
-
                     }
                 }
 

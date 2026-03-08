@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Events;
 using Pefi.Bank.Infrastructure.ReadStore;
@@ -5,11 +6,11 @@ using Pefi.Bank.Shared.ReadModels;
 
 namespace Pefi.Bank.Functions.Projections;
 
-public class LedgerProjectionHandler(IReadStore readStore) : IProjectionHandler
+public class LedgerProjectionHandler(IReadStore readStore, ILogger<LedgerProjectionHandler> logger) : ProjectionHandlerBase(logger)
 {
-    public bool CanHandle(string eventType) => eventType == nameof(LedgerTransactionRecorded);
+    protected override HashSet<string> HandlesEvents => [nameof(LedgerTransactionRecorded)];
 
-    public async Task HandleAsync(DomainEvent @event)
+    protected override async Task HandleInternalAsync(DomainEvent @event)
     {
         await (@event switch
         {

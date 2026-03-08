@@ -6,7 +6,7 @@ using Pefi.Bank.Infrastructure.EventStore;
 
 namespace Pefi.Bank.Functions.Projections;
 
-public abstract class SagaExecutor<T>(ILogger logger) : ISagaExecutor where T:Aggregate
+public abstract class SagaExecutorBase<T>(ILogger logger) : ISagaExecutor where T : Aggregate
 {
     protected abstract HashSet<string> SagaEvents { get; }
 
@@ -19,18 +19,27 @@ public abstract class SagaExecutor<T>(ILogger logger) : ISagaExecutor where T:Ag
         using var activity = DiagnosticConfig.Source.StartActivity("Saga.Execute");
         activity?.SetTag("pefi.saga.step", document.EventType);
         activity?.SetTag("pefi.stream_id", document.StreamId);
+        logger.LogInformation("Saga event {EventType} for stream {StreamId}", document.EventType, document.StreamId);
+
         await HandleBase(@event, document);
+
+        DiagnosticConfig.SagasStepsExecuted.Add(1,
+           new KeyValuePair<string, object?>("pefi.event_type", document.EventType),
+           new KeyValuePair<string, object?>("pefi.handler", GetType().Name));
+
     }
 
-    public abstract Task<T> GetSaga(Guid id) ;
-    
-    public abstract Task SaveSaga(T saga) ;
+    public abstract Task<T> GetSaga(Guid id);
+
+    public abstract Task SaveSaga(T saga);
+
+    private readonly string TypeName = typeof(T).Name;
 
     protected async Task ExecuteStep(
         Guid eventId,
         string stepName,
-        Func<T, Task > execute,
-        Func<T,Task>? compensate = null,
+        Func<T, Task> execute,
+        Func<T, Task>? compensate = null,
         bool markFailedOnError = true)
     {
         var stopwatch = Stopwatch.GetTimestamp();
@@ -41,21 +50,21 @@ public abstract class SagaExecutor<T>(ILogger logger) : ISagaExecutor where T:Ag
         {
             await execute(item);
             await SaveSaga(item);
-            logger.LogInformation("{Type} {TransferId} [{StepName}] completed",
-               nameof(T), eventId, stepName);
+            logger.LogInformation("Saga: {Type} {SagaId} Step [{StepName}] completed",
+               TypeName, eventId, stepName);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "{Type} {TransferId} [{StepName}] failed",
-                nameof(T), eventId, stepName);
+            logger.LogWarning(ex, "Saga: {Type} {SagaId} Step [{StepName}] failed",
+                TypeName, eventId, stepName);
 
             if (!markFailedOnError)
                 return;
 
             if (compensate is not null)
             {
-                logger.LogInformation("{Type} {TransferId} [{StepName}] compensating",
-                    nameof(T), eventId, stepName);
+                logger.LogInformation("Saga: {Type} {SagaId} Step [{StepName}] compensating",
+                    TypeName, eventId, stepName);
                 try
                 {
                     await compensate(item);
@@ -64,7 +73,7 @@ public abstract class SagaExecutor<T>(ILogger logger) : ISagaExecutor where T:Ag
                 catch (Exception compensateEx)
                 {
                     logger.LogCritical(compensateEx,
-                        "{Type} {TransferId} [{StepName}] COMPENSATION FAILED", nameof(T), eventId, stepName);
+                        "Saga: {Type} {SagaId} Step [{StepName}] COMPENSATION FAILED", TypeName, eventId, stepName);
                     return;
                 }
             }

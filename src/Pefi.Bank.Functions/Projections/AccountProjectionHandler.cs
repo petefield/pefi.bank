@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Events;
 using Pefi.Bank.Infrastructure.ReadStore;
@@ -7,14 +8,12 @@ namespace Pefi.Bank.Functions.Projections;
 
 public class AccountProjectionHandler(
     IReadStore readStore,
-    EventNotificationPublisher notificationPublisher) : IProjectionHandler
+    EventNotificationPublisher notificationPublisher, ILogger<AccountProjectionHandler> logger) 
+    : ProjectionHandlerBase(logger)
 {
-    private static readonly HashSet<string> HandledEvents =
-        [nameof(AccountOpened), nameof(FundsDeposited), nameof(FundsWithdrawn), nameof(AccountClosed)];
+    protected override HashSet<string> HandlesEvents => [nameof(AccountOpened), nameof(FundsDeposited), nameof(FundsWithdrawn), nameof(AccountClosed)];
 
-    public bool CanHandle(string eventType) => HandledEvents.Contains(eventType);
-
-    public async Task HandleAsync(DomainEvent @event)
+    protected override async Task HandleInternalAsync(DomainEvent @event)
     {
         await (@event switch
         {

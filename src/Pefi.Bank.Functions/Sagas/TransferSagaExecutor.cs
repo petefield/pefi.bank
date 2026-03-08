@@ -10,7 +10,7 @@ public class TransferSagaExecutor(
     IAggregateRepository<Account> accountRepo,
     IAggregateRepository<Transfer> transferRepo,
     IAggregateRepository<LedgerTransaction> ledgerRepo,
-    ILogger<TransferSagaExecutor> logger) : SagaExecutor<Transfer>(logger)
+    ILogger<TransferSagaExecutor> logger) : SagaExecutorBase<Transfer>(logger)
 {
 
     protected override HashSet<string> SagaEvents => [
@@ -28,13 +28,10 @@ public class TransferSagaExecutor(
         {
             // ── Step 1: Debit the source account ────────────────────────────
             case TransferInitiated e:
-                logger.LogInformation(
-                    "Transfer {TransferId} saga started — {Amount:C} from {SourceAccountId} to {DestinationAccountId} ({Description})",
-                    e.TransferId, e.Amount, e.SourceAccountId, e.DestinationAccountId, e.Description);
 
                 await ExecuteStep(
                     eventId: e.TransferId,
-                    stepName: "1/3 Debit source",
+                    stepName: "1/3 TransferInitiated -> Debit source",
                     execute: async (transfer) =>
                     {
                         var source = await accountRepo.LoadAsync(e.SourceAccountId);
@@ -49,7 +46,7 @@ public class TransferSagaExecutor(
             case TransferSourceDebited e:
                 await ExecuteStep(
                     eventId: e.TransferId, 
-                    stepName: "2/3 Credit destination",
+                    stepName: "2/3 TransferSourceDebited -> Credit destination",
                     execute: async (transfer) =>
                     {
                         var destination = await accountRepo.LoadAsync(transfer.DestinationAccountId);
@@ -72,7 +69,7 @@ public class TransferSagaExecutor(
             case TransferDestinationCredited e:
                 await ExecuteStep(
                     eventId: e.TransferId, 
-                    stepName: "3/3 Record ledger", 
+                    stepName: "3/3 TransferDestinationCredited -> Record ledger", 
                     execute: async (transfer) =>
                     {
                         var ledger = LedgerTransaction.Record(

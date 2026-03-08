@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Events;
 using Pefi.Bank.Infrastructure.ReadStore;
@@ -7,18 +8,20 @@ namespace Pefi.Bank.Functions.Projections;
 
 public class TransferProjectionHandler(
     IReadStore readStore,
-    EventNotificationPublisher notificationPublisher) : IProjectionHandler
+    EventNotificationPublisher notificationPublisher, ILogger<TransferProjectionHandler> logger) : ProjectionHandlerBase(logger)
 {
 
-    private static readonly HashSet<string> HandledEvents =
+ protected override HashSet<string> HandlesEvents => 
     [
-        nameof(TransferInitiated), nameof(TransferSourceDebited), nameof(TransferDestinationCredited),
-        nameof(TransferSourceDebitCompensated), nameof(TransferCompleted), nameof(TransferFailed)
+        nameof(TransferInitiated), 
+        nameof(TransferSourceDebited), 
+        nameof(TransferDestinationCredited),
+        nameof(TransferSourceDebitCompensated), 
+        nameof(TransferCompleted), 
+        nameof(TransferFailed)
     ];
 
-    public bool CanHandle(string eventType) => HandledEvents.Contains(eventType);
-
-    public async Task HandleAsync(DomainEvent @event)
+    protected override async Task HandleInternalAsync(DomainEvent @event)
     {
         await (@event switch
         {
