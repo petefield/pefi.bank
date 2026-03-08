@@ -1,9 +1,11 @@
 using System.Security.Claims;
+using Pefi.Bank.Api.Extensions;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Aggregates;
 using Pefi.Bank.Infrastructure.ReadStore;
 using Pefi.Bank.Shared.Commands;
 using Pefi.Bank.Shared.ReadModels;
+using StackExchange.Redis;
 
 namespace Pefi.Bank.Api.Endpoints;
 
@@ -15,6 +17,8 @@ public static class TransferEndpoints
 
         group.MapPost("/", InitiateTransfer).WithName("InitiateTransfer").RequireAuthorization();
         group.MapGet("/{id:guid}", GetTransfer).WithName("GetTransfer");
+        group.MapGet("/{id:guid}/events", SubscribeToTransferEvents).WithName("TransferEvents");
+
     }
 
     private static async Task<IResult> InitiateTransfer(
@@ -49,7 +53,12 @@ public static class TransferEndpoints
 
         return Results.Accepted(
             $"/transfers/{transferId}",
-            new { id = transferId, status = transfer.Status.ToString() });
+            new
+            {
+                id = transferId,
+                status = transfer.Status.ToString(),
+                eventsUrl = $"/transfers/{transferId}/events"
+            });
     }
 
     private static async Task<IResult> GetTransfer(
@@ -80,5 +89,13 @@ public static class TransferEndpoints
             UpdatedAt: DateTime.UtcNow,
             CompletedAt: aggregate.Status == TransferStatus.Completed ? DateTime.UtcNow : null
         ));
+    }
+
+    private static async Task SubscribeToTransferEvents(
+        Guid id,
+        HttpContext context,
+        IConnectionMultiplexer redis)
+    {
+        await redis.SubscribeToEvents(id, "transfer-events", context);
     }
 }

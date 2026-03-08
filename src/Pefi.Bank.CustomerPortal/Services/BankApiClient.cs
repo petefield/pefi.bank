@@ -71,10 +71,28 @@ public sealed class BankApiClient(HttpClient http)
     }
 
     // Transfers
-    public async Task TransferAsync(TransferCommand command)
+    public async Task<TransferInitiatedResponse> TransferAsync(TransferCommand command)
     {
         var response = await http.PostAsJsonAsync("transfers", command);
         response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<TransferInitiatedResponse>();
+        return result!;
+    }
+
+    public async IAsyncEnumerable<string> SubscribeToTransferEventsAsync(
+        string eventsUrl,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        using var stream = await http.GetStreamAsync(eventsUrl, ct);
+        await foreach (var item in SseParser.Create(stream).EnumerateAsync(ct))
+        {
+            yield return item.Data.ToString();
+        }
+    }
+
+    public async Task<TransferReadModel?> GetTransferAsync(Guid transferId)
+    {
+        return await http.GetFromJsonAsync<TransferReadModel>($"transfers/{transferId}");
     }
 
     // Statement entries
@@ -85,4 +103,5 @@ public sealed class BankApiClient(HttpClient http)
     }
 
     private sealed record AccountCreatedResponse(Guid Id, string EventsUrl);
+    public sealed record TransferInitiatedResponse(Guid Id, string Status, string EventsUrl);
 }

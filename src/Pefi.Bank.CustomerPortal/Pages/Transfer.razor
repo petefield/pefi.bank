@@ -1,6 +1,7 @@
 @page "/transfer"
 @inject BankApiClient Api
 @inject CustomerState State
+@implements IDisposable
 
 @if (!State.IsLoggedIn)
 {
@@ -48,58 +49,108 @@ else
         <p class="page-subtitle">Move money between your accounts</p>
     </div>
 
-    <div class="card" style="max-width: 480px;">
-        <div class="form-group">
-            <label class="form-label">From Account</label>
-            <select class="form-select" @bind="sourceAccountId">
-                <option value="">Select source account</option>
-                @foreach (var acct in accounts.Where(a => !a.IsClosed))
-                {
-                    <option value="@acct.Id">@acct.AccountName &middot; @acct.AccountNumber (@acct.Balance.ToString("C"))</option>
-                }
-            </select>
-        </div>
-
-        <div class="transfer-arrow">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(90 12 12)"/>
-            </svg>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">To Account</label>
-            <select class="form-select" @bind="destinationAccountId">
-                <option value="">Select destination account</option>
-                @foreach (var acct in accounts.Where(a => !a.IsClosed))
-                {
-                    <option value="@acct.Id">@acct.AccountName &middot; @acct.AccountNumber (@acct.Balance.ToString("C"))</option>
-                }
-            </select>
-        </div>
-
-        <div class="form-group mt-3">
-            <label class="form-label">Amount</label>
-            <input type="number" step="0.01" min="0.01" class="form-input" @bind="amount" placeholder="0.00" />
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Description (optional)</label>
-            <input type="text" class="form-input" @bind="description" placeholder="What's this transfer for?" />
-        </div>
-
-        <button type="button" class="btn btn-primary btn-full mt-3" @onclick="SubmitTransfer" disabled="@isLoading">
-            @(isLoading ? "Processing..." : "Transfer")
-        </button>
-    </div>
-
-    @if (!string.IsNullOrEmpty(message))
+    @if (transfer == null)
     {
-        <div class="alert alert-success mt-3" style="max-width: 480px;">@message</div>
+        <div class="card" style="max-width: 480px;">
+            <div class="form-group">
+                <label class="form-label">From Account</label>
+                <select class="form-select" @bind="sourceAccountId">
+                    <option value="">Select source account</option>
+                    @foreach (var acct in accounts.Where(a => !a.IsClosed))
+                    {
+                        <option value="@acct.Id">@acct.AccountName &middot; @acct.AccountNumber (@acct.Balance.ToString("C"))</option>
+                    }
+                </select>
+            </div>
+
+            <div class="transfer-arrow">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(90 12 12)"/>
+                </svg>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">To Account</label>
+                <select class="form-select" @bind="destinationAccountId">
+                    <option value="">Select destination account</option>
+                    @foreach (var acct in accounts.Where(a => !a.IsClosed))
+                    {
+                        <option value="@acct.Id">@acct.AccountName &middot; @acct.AccountNumber (@acct.Balance.ToString("C"))</option>
+                    }
+                </select>
+            </div>
+
+            <div class="form-group mt-3">
+                <label class="form-label">Amount</label>
+                <input type="number" step="0.01" min="0.01" class="form-input" @bind="amount" placeholder="0.00" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description (optional)</label>
+                <input type="text" class="form-input" @bind="description" placeholder="What's this transfer for?" />
+            </div>
+
+            <button type="button" class="btn btn-primary btn-full mt-3" @onclick="SubmitTransfer" disabled="@isLoading">
+                @(isLoading ? "Submitting..." : "Transfer")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-error mt-3" style="max-width: 480px;">@errorMessage</div>
+        }
     }
-
-    @if (!string.IsNullOrEmpty(errorMessage))
+    else
     {
-        <div class="alert alert-error mt-3" style="max-width: 480px;">@errorMessage</div>
+        <div class="card" style="max-width: 480px;">
+            <div class="section-header">
+                <h3 class="section-title">Transfer Status</h3>
+            </div>
+
+            <div class="transfer-status-summary mb-3">
+                <div class="text-secondary" style="font-size: 0.85rem;">
+                    @GetAccountName(transfer.SourceAccountId) &rarr; @GetAccountName(transfer.DestinationAccountId)
+                </div>
+                <div class="balance-medium mt-1">@transfer.Amount.ToString("C")</div>
+                @if (!string.IsNullOrEmpty(transfer.Description))
+                {
+                    <div class="text-muted mt-1" style="font-size: 0.85rem;">@transfer.Description</div>
+                }
+            </div>
+
+            <div class="transfer-steps">
+                <div class="transfer-step @StepClass("Initiated")">
+                    <div class="transfer-step-indicator">@StepIcon("Initiated")</div>
+                    <div class="transfer-step-label">Transfer initiated</div>
+                </div>
+                <div class="transfer-step @StepClass("SourceDebited")">
+                    <div class="transfer-step-indicator">@StepIcon("SourceDebited")</div>
+                    <div class="transfer-step-label">Source account debited</div>
+                </div>
+                <div class="transfer-step @StepClass("DestinationCredited")">
+                    <div class="transfer-step-indicator">@StepIcon("DestinationCredited")</div>
+                    <div class="transfer-step-label">Destination account credited</div>
+                </div>
+                <div class="transfer-step @StepClass("Completed")">
+                    <div class="transfer-step-indicator">@StepIcon("Completed")</div>
+                    <div class="transfer-step-label">Transfer complete</div>
+                </div>
+            </div>
+
+            @if (transfer.Status == "Failed")
+            {
+                <div class="alert alert-error mt-3">
+                    Transfer failed@(transfer.FailureReason != null ? $": {transfer.FailureReason}" : "")
+                </div>
+            }
+
+            @if (transfer.Status is "Completed" or "Failed")
+            {
+                <button type="button" class="btn btn-outline btn-full mt-3" @onclick="ResetForm">
+                    Make Another Transfer
+                </button>
+            }
+        </div>
     }
 }
 
@@ -109,9 +160,12 @@ else
     private string destinationAccountId = string.Empty;
     private decimal amount;
     private string description = string.Empty;
-    private string? message;
     private string? errorMessage;
     private bool isLoading;
+    private TransferReadModel? transfer;
+    private CancellationTokenSource? sseCts;
+
+    private static readonly string[] StatusOrder = ["Initiated", "SourceDebited", "DestinationCredited", "Completed"];
 
     protected override async Task OnInitializedAsync()
     {
@@ -123,7 +177,6 @@ else
 
     private async Task SubmitTransfer()
     {
-        message = null;
         errorMessage = null;
 
         if (string.IsNullOrEmpty(sourceAccountId) || string.IsNullOrEmpty(destinationAccountId))
@@ -153,21 +206,125 @@ else
                 amount,
                 description);
 
-            await Api.TransferAsync(command);
-            message = $"Transfer of {amount:C} completed successfully.";
-            amount = 0;
-            description = string.Empty;
-            sourceAccountId = string.Empty;
-            destinationAccountId = string.Empty;
-            accounts = await Api.GetAccountsAsync(State.CustomerId!.Value);
+            var response = await Api.TransferAsync(command);
+
+            transfer = new TransferReadModel(
+                Id: response.Id,
+                SourceAccountId: Guid.Parse(sourceAccountId),
+                DestinationAccountId: Guid.Parse(destinationAccountId),
+                Amount: amount,
+                Description: description,
+                Status: response.Status,
+                FailureReason: null,
+                InitiatedAt: DateTime.UtcNow,
+                UpdatedAt: DateTime.UtcNow,
+                CompletedAt: null);
+
+            isLoading = false;
+            StateHasChanged();
+
+            await SubscribeToEvents(response.EventsUrl, response.Id);
         }
         catch (Exception ex)
         {
             errorMessage = $"Transfer failed: {ex.Message}";
-        }
-        finally
-        {
             isLoading = false;
         }
+    }
+
+    private async Task SubscribeToEvents(string eventsUrl, Guid transferId)
+    {
+        sseCts = new CancellationTokenSource(TimeSpan.FromSeconds(3000));
+        try
+        {
+            await foreach (var data in Api.SubscribeToTransferEventsAsync(eventsUrl, sseCts.Token))
+            {
+                var updated = await Api.GetTransferAsync(transferId);
+                Console.WriteLine($"Received event for transfer {transferId}: {data}");
+                if (updated != null)
+                {
+                    transfer = updated;
+                    await InvokeAsync(StateHasChanged);
+                }
+
+                if (transfer?.Status is "Completed" or "Failed")
+                {
+                    await RefreshAccounts();
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Timeout — fetch final state
+            var updated = await Api.GetTransferAsync(transferId);
+            if (updated != null)
+            {
+                transfer = updated;
+            }
+            await RefreshAccounts();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RefreshAccounts()
+    {
+        accounts = await Api.GetAccountsAsync(State.CustomerId!.Value);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ResetForm()
+    {
+        transfer = null;
+        amount = 0;
+        description = string.Empty;
+        sourceAccountId = string.Empty;
+        destinationAccountId = string.Empty;
+        errorMessage = null;
+    }
+
+    private string GetAccountName(Guid accountId)
+    {
+        return accounts?.FirstOrDefault(a => a.Id == accountId)?.AccountName ?? "Account";
+    }
+
+    private int StatusIndex(string status) =>
+        Array.IndexOf(StatusOrder, status);
+
+    private string StepClass(string step)
+    {
+        if (transfer?.Status == "Failed")
+        {
+            // Mark completed steps as done, the rest as failed/pending
+            var failedAtIndex = StatusIndex(transfer.Status);
+            var stepIndex = StatusIndex(step);
+            return stepIndex < failedAtIndex ? "step-done" : "step-failed";
+        }
+
+        var currentIndex = StatusIndex(transfer?.Status ?? "");
+        var thisStepIndex = StatusIndex(step);
+
+        if (transfer?.Status == "Completed") return "step-done";
+        if (thisStepIndex < currentIndex) return "step-done";
+        if (thisStepIndex == currentIndex) return "step-active";
+        return "step-pending";
+    }
+
+    private string StepIcon(string step)
+    {
+        var cls = StepClass(step);
+        return cls switch
+        {
+            "step-done" => "\u2713",
+            "step-active" => "\u25CF",
+            "step-failed" => "\u2717",
+            _ => "\u25CB"
+        };
+    }
+
+    public void Dispose()
+    {
+        sseCts?.Cancel();
+        sseCts?.Dispose();
     }
 }

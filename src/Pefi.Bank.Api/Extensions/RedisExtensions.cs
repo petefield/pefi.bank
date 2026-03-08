@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Threading.Channels;
 using Pefi.Bank.Domain.Messages;
 using StackExchange.Redis;
 
@@ -19,8 +20,7 @@ public static class RedisExtensions
         var channel = RedisChannel.Literal(channelName);
         var ct = context.RequestAborted;
 
-        var tcs = new TaskCompletionSource<string>();
-        ct.Register(() => tcs.TrySetCanceled());
+        var events = Channel.CreateUnbounded<string>();
 
         await subscriber.SubscribeAsync(channel, (_, message) =>
         {
@@ -31,7 +31,7 @@ public static class RedisExtensions
 
                 if (msg is not null && Guid.Parse(msg.EntityId) == id)
                 {
-                    tcs.TrySetResult(messageStr);
+                    events.Writer.TryWrite(messageStr);
                 }
             }
             catch
@@ -42,15 +42,16 @@ public static class RedisExtensions
 
         try
         {
-            // Wait for a matching event or timeout (30 seconds)
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(30));
-            timeoutCts.Token.Register(() => tcs.TrySetCanceled());
 
-            var result = await tcs.Task;
-
-            await context.Response.WriteAsync($"data: {result}\n\n", ct);
-            await context.Response.Body.FlushAsync(ct);
+            await foreach (var result in events.Reader.ReadAllAsync(timeoutCts.Token))
+            {
+                var Body = $"data: {result}\n\n";
+                await context.Response.WriteAsync(Body, timeoutCts.Token);
+                await context.Response.Body.FlushAsync(timeoutCts.Token);
+                Console.WriteLine($"Sent event for entity {id} {Body} : {result}");
+            }
         }
         catch (OperationCanceledException)
         {
@@ -58,6 +59,7 @@ public static class RedisExtensions
         }
         finally
         {
+            events.Writer.TryComplete();
             await subscriber.UnsubscribeAsync(channel);
         }
     }

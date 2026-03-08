@@ -83,7 +83,7 @@ public class TransferProjectionHandler(
             UpdatedAt = timestamp
         }, existing.PartitionKey);
 
-        await notificationPublisher.PublishAsync(new (transferId.ToString(), "TransferStatusUpdated"), existing.PartitionKey);
+        await notificationPublisher.PublishAsync(new (transferId.ToString(), status), existing.PartitionKey);
 
     }
 }

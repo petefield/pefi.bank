@@ -912,6 +912,112 @@ a:hover {
     fill: var(--text-muted);
 }
 
+/* --- Transfer Status Steps --- */
+.transfer-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.transfer-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-left: 2px solid var(--card-border);
+    margin-left: 11px;
+    padding-left: 20px;
+    position: relative;
+}
+
+.transfer-step:first-child {
+    padding-top: 0;
+}
+
+.transfer-step:last-child {
+    padding-bottom: 0;
+    border-left-color: transparent;
+}
+
+.transfer-step-indicator {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    position: absolute;
+    left: -13px;
+}
+
+.transfer-step-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.transfer-step.step-done .transfer-step-indicator {
+    background: var(--green-bg);
+    color: var(--green);
+}
+
+.transfer-step.step-done .transfer-step-label {
+    color: var(--green);
+}
+
+.transfer-step.step-done {
+    border-left-color: var(--green);
+}
+
+.transfer-step.step-active .transfer-step-indicator {
+    background: var(--blue-bg);
+    color: var(--blue);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.transfer-step.step-active .transfer-step-label {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.transfer-step.step-active {
+    border-left-color: var(--blue);
+}
+
+.transfer-step.step-pending .transfer-step-indicator {
+    background: var(--page-bg);
+    color: var(--text-muted);
+}
+
+.transfer-step.step-pending .transfer-step-label {
+    color: var(--text-muted);
+}
+
+.transfer-step.step-failed .transfer-step-indicator {
+    background: var(--red-bg);
+    color: var(--red);
+}
+
+.transfer-step.step-failed .transfer-step-label {
+    color: var(--red);
+}
+
+.transfer-step.step-failed {
+    border-left-color: var(--red);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.transfer-status-summary {
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--card-border);
+}
+
 /* --- Empty State --- */
 .empty-state {
     text-align: center;
