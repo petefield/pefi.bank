@@ -91,7 +91,7 @@ else
         isLoading = true;
         try
         {
-            var result = await Api.LoginAsync(new Pefi.Bank.Shared.Commands.LoginCommand(email, password));
+            var result = await Api.LoginAsync(new LoginCommand(email, password));
             if (result is null)
             {
                 errorMessage = "Invalid email or password.";

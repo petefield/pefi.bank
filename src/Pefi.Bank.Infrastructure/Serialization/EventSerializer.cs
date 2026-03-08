@@ -42,6 +42,4 @@ public static class EventSerializer
         return (DomainEvent)(JsonSerializer.Deserialize(json, type, Options)
             ?? throw new InvalidOperationException($"Failed to deserialize event: {eventType}"));
     }
-
-    public static JsonSerializerOptions GetOptions() => Options;
 }

@@ -27,8 +27,7 @@ builder.Services
     .AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection))
     .AddSingleton<EventNotificationPublisher>();
 
-builder.Services.AddProjections()
-    .AddSagas();
+builder.Services.AddProjections();
 
 // ── OpenTelemetry ───────────────────────────────────────────────────────────
 builder.Services.AddOpenTelemetry()

@@ -124,6 +124,5 @@ public sealed class InMemoryUserStore :
 
     public void Dispose()
     {
-        GC.SuppressFinalize(this);
     }
 }

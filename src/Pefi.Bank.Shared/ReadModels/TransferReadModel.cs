@@ -1,6 +1,6 @@
 namespace Pefi.Bank.Shared.ReadModels;
 
-public  record TransferReadModel(
+public record TransferReadModel(
     Guid Id,
     Guid SourceAccountId,
     Guid DestinationAccountId,
@@ -13,5 +13,4 @@ public  record TransferReadModel(
     DateTime? CompletedAt)
 {
     public string PartitionKey { get; set; } = "transfer";
-
 }

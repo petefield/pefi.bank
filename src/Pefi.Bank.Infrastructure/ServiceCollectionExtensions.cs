@@ -56,7 +56,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped(typeof(IAggregateRepository<>), typeof(AggregateRepository<>));
 
         services.AddSingleton<IAccountQueries, CosmosAccountQueries>();
-        services.AddSingleton<ITransactionQueries, CosmosTransactionQueries>();
+        services.AddSingleton<IStatementEntryQueries, CosmosStatementEntryQueries>();
         services.AddSingleton<ILedgerQueries, CosmosLedgerQueries>();
         services.AddSingleton<ICustomerQueries, CosmosCustomerQueries>();
 

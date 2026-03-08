@@ -10,7 +10,6 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5100/";
 
 builder.Services.AddSingleton<CustomerState>();
-builder.Services.AddScoped<AuthTokenHandler>();
 builder.Services.AddScoped<BankApiClient>();
 builder.Services.AddScoped(sp =>
 {

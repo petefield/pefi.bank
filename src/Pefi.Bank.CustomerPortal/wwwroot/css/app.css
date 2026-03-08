@@ -250,6 +250,14 @@ a:hover {
     margin-bottom: 28px;
 }
 
+.page-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
 .page-title {
     font-size: 1.65rem;
     font-weight: 700;

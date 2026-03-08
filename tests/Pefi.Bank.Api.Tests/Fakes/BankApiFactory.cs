@@ -50,11 +50,11 @@ public class BankApiFactory : WebApplicationFactory<Program>
 
             // Replace Cosmos query services with in-memory fakes
             services.RemoveAll<IAccountQueries>();
-            services.RemoveAll<ITransactionQueries>();
+            services.RemoveAll<IStatementEntryQueries>();
             services.RemoveAll<ILedgerQueries>();
             services.RemoveAll<ICustomerQueries>();
             services.AddSingleton<IAccountQueries>(new InMemoryAccountQueries(ReadStore));
-            services.AddSingleton<ITransactionQueries>(new InMemoryTransactionQueries(ReadStore));
+            services.AddSingleton<IStatementEntryQueries>(new InMemoryStatementEntryQueries(ReadStore));
             services.AddSingleton<ILedgerQueries>(new InMemoryLedgerQueries(ReadStore));
             services.AddSingleton<ICustomerQueries>(new InMemoryCustomerQueries(ReadStore));
 

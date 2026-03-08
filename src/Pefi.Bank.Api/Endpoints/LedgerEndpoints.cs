@@ -1,4 +1,3 @@
-
 using Pefi.Bank.Shared.Queries;
 
 namespace Pefi.Bank.Api.Endpoints;
@@ -22,5 +21,4 @@ public static class LedgerEndpoints
 
         return Results.Ok(entries);
     }
-
 }

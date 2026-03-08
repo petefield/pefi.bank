@@ -10,53 +10,65 @@
 else
 {
     <div class="page-header">
-        <h1 class="page-title">Dashboard</h1>
-        <p class="page-subtitle">Welcome back@(customer != null ? $", {customer.FirstName}" : "")</p>
+        <div class="page-header-row">
+            <div>
+                <h1 class="page-title">Accounts</h1>
+                <p class="page-subtitle">Your bank accounts at a glance</p>
+            </div>
+            <div class="actions-row">
+                <a href="accounts" class="btn btn-primary">+ New Account</a>
+                <a href="transfer" class="btn btn-outline">Transfer</a>
+            </div>
+        </div>
     </div>
 
-    @if (customer != null)
-    {
-        <div class="card mb-4" style="max-width: 560px;">
-            <div class="profile-card">
-                <div class="profile-avatar">
-                    @customer.FirstName[0]@customer.LastName[0]
-                </div>
-                <div class="profile-info">
-                    <div class="profile-name">@customer.FirstName @customer.LastName</div>
-                    <div class="profile-email">@customer.Email</div>
-                    <div class="profile-meta">Member since @customer.CreatedAt.ToString("MMMM yyyy")</div>
-                </div>
-            </div>
-
-            <div class="stat-row">
-                <div class="stat-chip">
-                    <div class="stat-chip-value">@customer.AccountCount</div>
-                    <div class="stat-chip-label">Accounts</div>
-                </div>
-                <div class="stat-chip">
-                    <div class="stat-chip-value">@customer.CreatedAt.ToString("dd MMM yyyy")</div>
-                    <div class="stat-chip-label">Joined</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="actions-row">
-            <a href="accounts" class="btn btn-primary">View Accounts</a>
-            <a href="transfer" class="btn btn-outline">Make Transfer</a>
-        </div>
-    }
-    else if (isLoading)
+    @if (accounts == null)
     {
         <div class="loading-card">
             <div class="spinner"></div>
-            <span>Loading your profile...</span>
+            <span>Loading accounts...</span>
+        </div>
+    }
+    else if (accounts.Count == 0)
+    {
+        <div class="card">
+            <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1H12c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                </svg>
+                <div class="empty-state-title">No accounts yet</div>
+                <div class="empty-state-text">Head over to <a href="/accounts">Accounts</a> to open your first account.</div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="account-grid">
+            @foreach (var acct in accounts)
+            {
+                <a href="accounts/@acct.Id" class="account-card">
+                    <div class="account-card-header">
+                        <span class="account-card-name">@acct.AccountName</span>
+                        <span class="account-card-badge @(acct.IsClosed ? "badge-closed" : "badge-active")">
+                            @(acct.IsClosed ? "Closed" : "Active")
+                        </span>
+                    </div>
+                    <div class="account-card-sort-acct">
+                        @acct.SortCode &middot; @acct.AccountNumber
+                    </div>
+                    <div class="account-card-balance">@acct.Balance.ToString("C")</div>
+                    <div class="account-card-footer">
+                        <span>Opened @acct.OpenedAt.ToString("dd MMM yyyy")</span>
+                        <span>View &rarr;</span>
+                    </div>
+                </a>
+            }
         </div>
     }
 }
 
 @code {
-    private bool isLoading;
-    private CustomerReadModel? customer;
+    private List<AccountReadModel>? accounts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -66,23 +78,6 @@ else
             return;
         }
 
-        await LoadCustomer();
-    }
-
-    private async Task LoadCustomer()
-    {
-        isLoading = true;
-        try
-        {
-            customer = await Api.GetCustomerAsync(State.CustomerId!.Value);
-        }
-        catch
-        {
-            // Customer projection may not be ready yet — show dashboard without profile
-        }
-        finally
-        {
-            isLoading = false;
-        }
+        accounts = await Api.GetAccountsAsync(State.CustomerId!.Value);
     }
 }

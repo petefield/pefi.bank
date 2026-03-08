@@ -104,7 +104,6 @@ public class Account : Aggregate
 
             case FundsWithdrawn e:
                 Balance -= e.Amount;
-
                 break;
 
             case AccountClosed:

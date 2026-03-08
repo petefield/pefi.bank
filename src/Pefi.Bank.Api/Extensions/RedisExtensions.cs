@@ -2,13 +2,11 @@ using System.Text.Json;
 using Pefi.Bank.Domain.Messages;
 using StackExchange.Redis;
 
-namespace   Pefi.Bank.Api.Extensions;
+namespace Pefi.Bank.Api.Extensions;
 
 public static class RedisExtensions
 {
-
-
- public static async Task SubscribeToEvents(this IConnectionMultiplexer redis,
+    public static async Task SubscribeToEvents(this IConnectionMultiplexer redis,
         Guid id,
         string channelName,
         HttpContext context)
@@ -30,8 +28,6 @@ public static class RedisExtensions
             {
                 var messageStr = (string)message!;
                 var msg = JsonSerializer.Deserialize<EntityStateChangedMessage>(messageStr);
-
-                if (msg is null) return;
 
                 if (msg is not null && Guid.Parse(msg.EntityId) == id)
                 {

@@ -9,14 +9,12 @@ public class CustomerProjectionHandler(
     IReadStore readStore,
     EventNotificationPublisher notificationPublisher) : IProjectionHandler
 {
-
     private static readonly HashSet<string> HandledEvents = [nameof(CustomerCreated), nameof(CustomerUpdated)];
 
     public bool CanHandle(string eventType) => HandledEvents.Contains(eventType);
 
     public async Task HandleAsync(DomainEvent @event)
     {
-
         await (@event switch
         {
             CustomerCreated e => HandleCustomerCreated(e),
@@ -27,7 +25,6 @@ public class CustomerProjectionHandler(
 
     private async Task HandleCustomerCreated(CustomerCreated evt)
     {
-        
         var model = new CustomerReadModel
         {
             Id = evt.CustomerId,
@@ -40,15 +37,14 @@ public class CustomerProjectionHandler(
         };
 
         await readStore.UpsertAsync(model, model.PartitionKey);
-        await notificationPublisher.PublishAsync(new ( evt.CustomerId.ToString(),  evt.EventType), model.PartitionKey);
-
+        await notificationPublisher.PublishAsync(new(evt.CustomerId.ToString(), evt.EventType), model.PartitionKey);
     }
 
-    private async Task HandleCustomerUpdated(CustomerUpdated? evt)
+    private async Task HandleCustomerUpdated(CustomerUpdated evt)
     {
         ArgumentNullException.ThrowIfNull(evt);
 
-        var existing = await readStore.GetAsync<CustomerReadModel>(evt.CustomerId.ToString(),  "customer");
+        var existing = await readStore.GetAsync<CustomerReadModel>(evt.CustomerId.ToString(), "customer");
         
         if (existing is null) 
             return;
@@ -61,6 +57,6 @@ public class CustomerProjectionHandler(
         };
 
         await readStore.UpsertAsync(customerReadModel, existing.PartitionKey);
-        await notificationPublisher.PublishAsync(new ( evt.CustomerId.ToString(), evt.EventType), existing.PartitionKey);
+        await notificationPublisher.PublishAsync(new(evt.CustomerId.ToString(), evt.EventType), existing.PartitionKey);
     }
 }

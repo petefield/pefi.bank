@@ -12,18 +12,17 @@ public class TransferProjectionHandler(
 
     private static readonly HashSet<string> HandledEvents =
     [
-        "TransferInitiated", "TransferSourceDebited", "TransferDestinationCredited",
-        "TransferSourceDebitCompensated", "TransferCompleted", "TransferFailed"
+        nameof(TransferInitiated), nameof(TransferSourceDebited), nameof(TransferDestinationCredited),
+        nameof(TransferSourceDebitCompensated), nameof(TransferCompleted), nameof(TransferFailed)
     ];
 
     public bool CanHandle(string eventType) => HandledEvents.Contains(eventType);
-
 
     public async Task HandleAsync(DomainEvent @event)
     {
         await (@event switch
         {
-            TransferInitiated e => HandleInitiatedAsync(e), 
+            TransferInitiated e => HandleInitiatedAsync(e),
             TransferSourceDebited e => UpdateTransferStatus(e.TransferId, "SourceDebited", e.OccurredAt),
             TransferDestinationCredited e => UpdateTransferStatus(e.TransferId, "DestinationCredited", e.OccurredAt),
             TransferSourceDebitCompensated e => UpdateTransferStatus(e.TransferId, "SourceDebitCompensated", e.OccurredAt),
@@ -33,7 +32,7 @@ public class TransferProjectionHandler(
         });
     }
 
-    public async Task HandleInitiatedAsync(TransferInitiated @event)
+    private async Task HandleInitiatedAsync(TransferInitiated @event)
     {
         var model = new TransferReadModel(        
             Id: @event.TransferId,
@@ -53,7 +52,7 @@ public class TransferProjectionHandler(
 
     }
 
-    public async Task HandleFailedAsync(TransferFailed @event)
+    private async Task HandleFailedAsync(TransferFailed @event)
     {
         var existing = await readStore.GetAsync<TransferReadModel>(@event.TransferId.ToString(), "transfer");
 
@@ -73,7 +72,7 @@ public class TransferProjectionHandler(
     {
         var existing = await readStore.GetAsync<TransferReadModel>(transferId.ToString(), "transfer");
 
-        if (existing is  null)
+        if (existing is null)
             return;     
         
         await readStore.UpsertAsync(existing with { 

@@ -103,7 +103,7 @@ else
         try
         {
             var result = await Api.RegisterAsync(
-                new Pefi.Bank.Shared.Commands.RegisterCommand(firstName, lastName, email, password));
+                new RegisterCommand(firstName, lastName, email, password));
 
             State.SetAuth(result.CustomerId, result.Token, result.Email);
             Nav.NavigateTo("/", forceLoad: false);

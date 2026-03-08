@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Azure.Cosmos;
 
 namespace Pefi.Bank.Infrastructure.ReadStore;
@@ -16,13 +14,6 @@ public interface IReadStore
 
 public class CosmosReadStore(Container container) : IReadStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new JsonStringEnumConverter() }
-    };
-
     public async Task<T?> GetAsync<T>(string id, string partitionKey, CancellationToken ct = default) where T : class
     {
         using var activity = DiagnosticConfig.Source.StartActivity("ReadStore.Get");

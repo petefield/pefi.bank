@@ -70,6 +70,7 @@ for (var i = 0; i < customerCount; i++)
     if (!registerResponse.IsSuccessStatusCode)
     {
         Console.Error.WriteLine($"  Failed to register customer {firstName} {lastName}: {registerResponse.StatusCode}");
+        http.DefaultRequestHeaders.Authorization = null;
         continue;
     }
 

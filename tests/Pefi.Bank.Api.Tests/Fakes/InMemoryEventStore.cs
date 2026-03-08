@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Exceptions;
 
@@ -6,8 +5,8 @@ namespace Pefi.Bank.Api.Tests.Fakes;
 
 public sealed class InMemoryEventStore : IEventStore
 {
-    private readonly ConcurrentDictionary<string, List<IEvent>> _streams = new();
-    private readonly ConcurrentDictionary<string, int> _versions = new();
+    private readonly Dictionary<string, List<IEvent>> _streams = new();
+    private readonly Dictionary<string, int> _versions = new();
     private readonly object _lock = new();
 
     public Task<IReadOnlyList<IEvent>> LoadEventsAsync(string streamId, CancellationToken ct = default)

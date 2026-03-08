@@ -9,7 +9,6 @@ public class AccountProjectionHandler(
     IReadStore readStore,
     EventNotificationPublisher notificationPublisher) : IProjectionHandler
 {
-
     private static readonly HashSet<string> HandledEvents =
         [nameof(AccountOpened), nameof(FundsDeposited), nameof(FundsWithdrawn), nameof(AccountClosed)];
 
@@ -27,10 +26,8 @@ public class AccountProjectionHandler(
         });
     }
 
-
-    private async Task HandleAccountOpened(AccountOpened accountOpened )
+    private async Task HandleAccountOpened(AccountOpened accountOpened)
     {
-
         var model = new AccountReadModel(
             accountOpened.AccountId,
             accountOpened.CustomerId,
@@ -56,35 +53,34 @@ public class AccountProjectionHandler(
             await readStore.UpsertAsync(customer, customer.PartitionKey);
         }
 
-        await notificationPublisher.PublishAsync(new ( accountOpened.AccountId.ToString(),  accountOpened.EventType), model.PartitionKey);
+        await notificationPublisher.PublishAsync(new(accountOpened.AccountId.ToString(), accountOpened.EventType), model.PartitionKey);
     }
 
     private async Task HandleFundsDeposited(FundsDeposited e) =>
-        await HandleAccountBalanceChange(TransactionType.Credit, e.AccountId, e.Amount, e.Description, e.OccurredAt);
+        await HandleAccountBalanceChange(StatementEntryType.Credit, e.AccountId, e.Amount, e.Description, e.OccurredAt);
     
     private async Task HandleFundsWithdrawn(FundsWithdrawn e) =>
-        await HandleAccountBalanceChange(TransactionType.Debit, e.AccountId, e.Amount, e.Description, e.OccurredAt);
+        await HandleAccountBalanceChange(StatementEntryType.Debit, e.AccountId, e.Amount, e.Description, e.OccurredAt);
 
-    private async Task HandleAccountBalanceChange(TransactionType transactionType, Guid accountId, decimal amount, string description,  DateTime timestamp)
+    private async Task HandleAccountBalanceChange(StatementEntryType entryType, Guid accountId, decimal amount, string description, DateTime timestamp)
     {
         var account = await readStore.GetAsync<AccountReadModel>(accountId.ToString(), "account");
         if (account is null) return;
 
         var newAccountReadModel = account with
         {
-            Balance = transactionType == TransactionType.Credit ? account.Balance + amount : account.Balance - amount,
+            Balance = entryType == StatementEntryType.Credit ? account.Balance + amount : account.Balance - amount,
             UpdatedAt = timestamp
         };
 
         await readStore.UpsertAsync(newAccountReadModel, "account");
 
-        await CreateTransaction(accountId, transactionType, amount, description, newAccountReadModel.Balance, timestamp);
-        await notificationPublisher.PublishAsync(new ( accountId.ToString(),  transactionType.ToString()), "account");
+        await CreateStatementEntry(accountId, entryType, amount, description, newAccountReadModel.Balance, timestamp);
+        await notificationPublisher.PublishAsync(new(accountId.ToString(), entryType.ToString()), "account");
     }
 
     private async Task HandleAccountClosed(AccountClosed e)
     {
-   
         var account = await readStore.GetAsync<AccountReadModel>(e.AccountId.ToString(), "account");
         if (account is null) return;
 
@@ -95,18 +91,18 @@ public class AccountProjectionHandler(
         };
 
         await readStore.UpsertAsync(newAccountReadModel, "account");
-        await notificationPublisher.PublishAsync(new ( e.AccountId.ToString(),  nameof(e) ), "account");
+        await notificationPublisher.PublishAsync(new (e.AccountId.ToString(), nameof(AccountClosed)), "account");
     }
 
-    private async Task CreateTransaction(
+    private async Task CreateStatementEntry(
         Guid accountId, 
-        TransactionType type, 
+        StatementEntryType type, 
         decimal amount, 
         string description, 
         decimal balanceAfter, 
         DateTime occurredAt)
     {
-        var transaction = new TransactionReadModel
+        var entry = new StatementEntryReadModel
         {
             Id = Guid.NewGuid(),
             AccountId = accountId,
@@ -117,8 +113,6 @@ public class AccountProjectionHandler(
             OccurredAt = occurredAt
         };
 
-        await readStore.UpsertAsync(transaction, "transaction");
+        await readStore.UpsertAsync(entry, "statement-entry");
     }
-
-
 }

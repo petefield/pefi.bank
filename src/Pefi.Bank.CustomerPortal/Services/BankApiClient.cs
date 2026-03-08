@@ -5,26 +5,19 @@ using Pefi.Bank.Shared.ReadModels;
 
 namespace Pefi.Bank.CustomerPortal.Services;
 
-public class BankApiClient
+public sealed class BankApiClient(HttpClient http)
 {
-    private readonly HttpClient _http;
-
-    public BankApiClient(HttpClient http)
-    {
-        _http = http;
-    }
-
     // Auth
     public async Task<AuthResponse> RegisterAsync(RegisterCommand command)
     {
-        var response = await _http.PostAsJsonAsync("auth/register", command);
+        var response = await http.PostAsJsonAsync("auth/register", command);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
     }
 
     public async Task<AuthResponse?> LoginAsync(LoginCommand command)
     {
-        var response = await _http.PostAsJsonAsync("auth/login", command);
+        var response = await http.PostAsJsonAsync("auth/login", command);
         if (!response.IsSuccessStatusCode)
             return null;
         return await response.Content.ReadFromJsonAsync<AuthResponse>();
@@ -33,19 +26,19 @@ public class BankApiClient
     // Customers
     public async Task<CustomerReadModel?> GetCustomerAsync(Guid customerId)
     {
-        return await _http.GetFromJsonAsync<CustomerReadModel>($"customers/{customerId}");
+        return await http.GetFromJsonAsync<CustomerReadModel>($"customers/{customerId}");
     }
 
     // Accounts
     public async Task<List<AccountReadModel>> GetAccountsAsync(Guid customerId)
     {
-        return await _http.GetFromJsonAsync<List<AccountReadModel>>($"customers/{customerId}/accounts")
-               ?? new List<AccountReadModel>();
+        return await http.GetFromJsonAsync<List<AccountReadModel>>($"customers/{customerId}/accounts")
+               ?? [];
     }
 
     public async Task<(Guid Id, string EventsUrl)> OpenAccountAsync(OpenAccountCommand command)
     {
-        var response = await _http.PostAsJsonAsync("accounts", command);
+        var response = await http.PostAsJsonAsync("accounts", command);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<AccountCreatedResponse>();
         return (result!.Id, result.EventsUrl);
@@ -55,7 +48,7 @@ public class BankApiClient
     {
         try
         {
-            using var stream = await _http.GetStreamAsync(eventsUrl, ct);
+            using var stream = await http.GetStreamAsync(eventsUrl, ct);
             await foreach (var item in SseParser.Create(stream).EnumerateAsync(ct))
             {
                 return item.Data.ToString();
@@ -67,28 +60,28 @@ public class BankApiClient
 
     public async Task DepositAsync(Guid accountId, DepositCommand command)
     {
-        var response = await _http.PostAsJsonAsync($"accounts/{accountId}/deposit", command);
+        var response = await http.PostAsJsonAsync($"accounts/{accountId}/deposit", command);
         response.EnsureSuccessStatusCode();
     }
 
     public async Task WithdrawAsync(Guid accountId, WithdrawCommand command)
     {
-        var response = await _http.PostAsJsonAsync($"accounts/{accountId}/withdraw", command);
+        var response = await http.PostAsJsonAsync($"accounts/{accountId}/withdraw", command);
         response.EnsureSuccessStatusCode();
     }
 
     // Transfers
     public async Task TransferAsync(TransferCommand command)
     {
-        var response = await _http.PostAsJsonAsync("transfers", command);
+        var response = await http.PostAsJsonAsync("transfers", command);
         response.EnsureSuccessStatusCode();
     }
 
-    // Transactions
-    public async Task<List<TransactionReadModel>> GetTransactionsAsync(Guid accountId)
+    // Statement entries
+    public async Task<List<StatementEntryReadModel>> GetStatementEntriesAsync(Guid accountId)
     {
-        return await _http.GetFromJsonAsync<List<TransactionReadModel>>($"accounts/{accountId}/transactions")
-               ?? new List<TransactionReadModel>();
+        return await http.GetFromJsonAsync<List<StatementEntryReadModel>>($"accounts/{accountId}/transactions")
+               ?? [];
     }
 
     private sealed record AccountCreatedResponse(Guid Id, string EventsUrl);

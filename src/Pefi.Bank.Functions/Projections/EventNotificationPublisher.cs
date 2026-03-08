@@ -9,13 +9,11 @@ public class EventNotificationPublisher(
     IConnectionMultiplexer redis,
     ILogger<EventNotificationPublisher> logger)
 {
-    public async Task PublishAsync( EntityStateChangedMessage msg, string channel)
+    public async Task PublishAsync(EntityStateChangedMessage msg, string channel)
     {
         try
         {
             var subscriber = redis.GetSubscriber();
-
-
             var message = JsonSerializer.Serialize(msg);
             await subscriber.PublishAsync(RedisChannel.Literal($"{channel}-events"), message);
             logger.LogInformation("Published state change: {EntityId} -> {State} on channel {Channel}", msg.EntityId, msg.State, channel);

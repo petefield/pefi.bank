@@ -1,5 +1,4 @@
 using Pefi.Bank.Domain.Aggregates;
-using Pefi.Bank.Domain.Exceptions;
 
 namespace Pefi.Bank.Domain.Tests;
 

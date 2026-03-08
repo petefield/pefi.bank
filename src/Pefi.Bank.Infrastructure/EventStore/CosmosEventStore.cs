@@ -43,7 +43,7 @@ public class CosmosEventStore(Container container) : IEventStore
         activity?.SetTag("pefi.stream_id", streamId);
         activity?.SetTag("pefi.event_count", events.Count);
         activity?.SetTag("pefi.expected_version", expectedVersion);
-        activity?.SetTag("pefi.event_types", events.Select(e => e.EventType).Aggregate((a, b) => $"{a},{b}"));
+        activity?.SetTag("pefi.event_types", string.Join(",", events.Select(e => e.EventType)));
 
         // Check current version for optimistic concurrency
         var currentVersion = await GetStreamVersionAsync(streamId, ct);
@@ -65,8 +65,8 @@ public class CosmosEventStore(Container container) : IEventStore
                 Version = version,
                 Data = EventSerializer.Serialize(@event),
                 Timestamp = @event.OccurredAt,
-                TraceId = Activity.Current?.TraceId.ToString(),
-                SpanId = Activity.Current?.SpanId.ToString()
+                TraceId = activity?.TraceId.ToString(),
+                SpanId = activity?.SpanId.ToString()
             };
 
             batch.CreateItem(document);

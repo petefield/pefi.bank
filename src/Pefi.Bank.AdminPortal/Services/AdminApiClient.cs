@@ -40,9 +40,9 @@ public sealed class AdminApiClient
         return await _http.GetFromJsonAsync<AccountReadModel>($"accounts/{id}");
     }
 
-    public async Task<List<TransactionReadModel>> GetAccountTransactionsAsync(Guid accountId)
+    public async Task<List<StatementEntryReadModel>> GetAccountStatementEntriesAsync(Guid accountId)
     {
-        return await _http.GetFromJsonAsync<List<TransactionReadModel>>($"accounts/{accountId}/transactions")
+        return await _http.GetFromJsonAsync<List<StatementEntryReadModel>>($"accounts/{accountId}/transactions")
                ?? [];
     }
 

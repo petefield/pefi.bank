@@ -40,19 +40,19 @@
     </main>
 </div>
 
+@implements IDisposable
+
 @code {
     [Inject] private CustomerState State { get; set; } = default!;
     [Inject] private BankApiClient Api { get; set; } = default!;
     [Inject] private NavigationManager Nav { get; set; } = default!;
 
     private CustomerReadModel? customer;
-    private bool hasRestoredAuth;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !hasRestoredAuth)
+        if (firstRender)
         {
-            hasRestoredAuth = true;
             await State.RestoreAsync();
             if (State.IsLoggedIn)
             {
@@ -97,5 +97,10 @@
     {
         State.Clear();
         Nav.NavigateTo("/signin", forceLoad: false);
+    }
+
+    public void Dispose()
+    {
+        State.OnChange -= OnStateChanged;
     }
 }

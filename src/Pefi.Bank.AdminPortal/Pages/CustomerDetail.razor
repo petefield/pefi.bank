@@ -126,7 +126,7 @@ else
 
     private CustomerReadModel? _customer;
     private List<AccountReadModel> _accounts = [];
-    private List<TransactionReadModel> _transactions = [];
+    private List<StatementEntryReadModel> _transactions = [];
     private Guid? _selectedAccountId;
     private bool _loading = true;
     private bool _loadingTransactions;
@@ -167,7 +167,7 @@ else
 
         try
         {
-            _transactions = await Api.GetAccountTransactionsAsync(accountId);
+            _transactions = await Api.GetAccountStatementEntriesAsync(accountId);
         }
         catch (Exception ex)
         {

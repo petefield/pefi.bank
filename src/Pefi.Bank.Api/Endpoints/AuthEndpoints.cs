@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Pefi.Bank.Auth;
 using Pefi.Bank.Domain;

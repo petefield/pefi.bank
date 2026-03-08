@@ -1,4 +1,4 @@
-@page "/accounts/{Id}"
+@page "/accounts/{Id:guid}"
 @inject BankApiClient Api
 @inject CustomerState State
 
@@ -144,10 +144,10 @@ else
 }
 
 @code {
-    [Parameter] public string Id { get; set; } = string.Empty;
+    [Parameter] public Guid Id { get; set; }
 
     private AccountReadModel? account;
-    private List<TransactionReadModel>? transactions;
+    private List<StatementEntryReadModel>? transactions;
     private decimal depositAmount;
     private string depositDescription = string.Empty;
     private decimal withdrawAmount;
@@ -155,8 +155,6 @@ else
     private string? message;
     private string? errorMessage;
     private bool isLoading;
-
-    private Guid AccountId => Guid.Parse(Id);
 
     protected override async Task OnInitializedAsync()
     {
@@ -169,8 +167,8 @@ else
     private async Task LoadData()
     {
         var accounts = await Api.GetAccountsAsync(State.CustomerId!.Value);
-        account = accounts.FirstOrDefault(a => a.Id == AccountId);
-        transactions = await Api.GetTransactionsAsync(AccountId);
+        account = accounts.FirstOrDefault(a => a.Id == Id);
+        transactions = await Api.GetStatementEntriesAsync(Id);
     }
 
     private async Task Deposit()
@@ -187,7 +185,7 @@ else
         isLoading = true;
         try
         {
-            await Api.DepositAsync(AccountId, new DepositCommand(depositAmount, depositDescription));
+            await Api.DepositAsync(Id, new DepositCommand(depositAmount, depositDescription));
             message = $"Deposited {depositAmount:C} successfully.";
             depositAmount = 0;
             depositDescription = string.Empty;
@@ -217,7 +215,7 @@ else
         isLoading = true;
         try
         {
-            await Api.WithdrawAsync(AccountId, new WithdrawCommand(withdrawAmount, withdrawDescription));
+            await Api.WithdrawAsync(Id, new WithdrawCommand(withdrawAmount, withdrawDescription));
             message = $"Withdrew {withdrawAmount:C} successfully.";
             withdrawAmount = 0;
             withdrawDescription = string.Empty;
@@ -233,31 +231,31 @@ else
         }
     }
 
-    private static string GetTxIconClass(TransactionType type) => type switch
+    private static string GetTxIconClass(StatementEntryType type) => type switch
     {
-        TransactionType.Credit => "tx-icon-deposit",
-        TransactionType.Debit => "tx-icon-withdrawal",
+        StatementEntryType.Credit => "tx-icon-deposit",
+        StatementEntryType.Debit => "tx-icon-withdrawal",
         _ => "tx-icon-transfer"
     };
 
-    private static string GetTxIconSvg(TransactionType type) => type switch
+    private static string GetTxIconSvg(StatementEntryType type) => type switch
     {
-        TransactionType.Credit => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>""",
-        TransactionType.Debit => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8z"/></svg>""",
+        StatementEntryType.Credit => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>""",
+        StatementEntryType.Debit => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 4l1.41 1.41L7.83 11H20v2H7.83l5.58 5.59L12 20l-8-8z"/></svg>""",
         _ => """<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>"""
     };
 
-    private static string GetTxAmountClass(TransactionType type) => type switch
+    private static string GetTxAmountClass(StatementEntryType type) => type switch
     {
-        TransactionType.Credit => "tx-amount-positive",
-        TransactionType.Debit => "tx-amount-negative",
+        StatementEntryType.Credit => "tx-amount-positive",
+        StatementEntryType.Debit => "tx-amount-negative",
         _ => "tx-amount-neutral"
     };
 
-    private static string GetTxAmountPrefix(TransactionType type) => type switch
+    private static string GetTxAmountPrefix(StatementEntryType type) => type switch
     {
-        TransactionType.Credit => "+",
-        TransactionType.Debit => "-",
+        StatementEntryType.Credit => "+",
+        StatementEntryType.Debit => "-",
         _ => ""
     };
 }

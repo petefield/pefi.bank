@@ -32,6 +32,10 @@ public static class DiagnosticConfig
         Meter.CreateCounter<long>("pefi.bank.saga.completed", "sagas",
             "Number of transfer sagas that completed successfully");
 
+    public static readonly Counter<long> SagasStepsExecuted =
+        Meter.CreateCounter<long>("pefi.bank.saga.stepsExecuted", "sagas",
+            "Number of transfer saga steps executed (including compensation steps)");
+
     public static readonly Counter<long> SagasFailed =
         Meter.CreateCounter<long>("pefi.bank.saga.failed", "sagas",
             "Number of transfer sagas that failed or required compensation");

@@ -1,7 +1,5 @@
 namespace Pefi.Bank.Shared.ReadModels;
 
-
-
 public record AccountReadModel(
     Guid Id,
     Guid CustomerId,
@@ -14,7 +12,7 @@ public record AccountReadModel(
     DateTime UpdatedAt,
     decimal OverdraftLimit)
 {
-    public string PartitionKey { get;  } = "account";
+    public string PartitionKey { get; } = "account";
 
     public decimal Balance { get; set; } = Balance;
 }

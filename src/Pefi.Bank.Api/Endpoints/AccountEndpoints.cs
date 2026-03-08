@@ -33,8 +33,6 @@ public static class AccountEndpoints
 
     private static Guid GetCustomerIdFromClaims(HttpContext context)
     {
-
-        
         var claim = context.User.FindFirst("customerId")
             ?? context.User.FindFirst(ClaimTypes.NameIdentifier);
         return Guid.Parse(claim!.Value);
@@ -111,8 +109,6 @@ public static class AccountEndpoints
             eventsUrl = $"/transfers/{transferId}/events" });
     }
 
-
-
     private static async Task<IResult> CloseAccount(
         Guid id,
         IAggregateRepository<Account> repository)
@@ -129,10 +125,10 @@ public static class AccountEndpoints
 
     private static async Task<IResult> GetTransactions(
         Guid id,
-        ITransactionQueries transactionQueries)
+        IStatementEntryQueries statementEntryQueries)
     {
-        var transactions = await transactionQueries.GetByAccountIdAsync(id);
-        return Results.Ok(transactions);
+        var entries = await statementEntryQueries.GetByAccountIdAsync(id);
+        return Results.Ok(entries);
     }
 
     private static async Task<IResult> GetCustomerAccounts(

@@ -20,7 +20,6 @@ public class LedgerProjectionHandler(IReadStore readStore) : IProjectionHandler
 
     private async Task HandleTransactionRecordedAsync(LedgerTransactionRecorded e)
     {
-
         // Create debit entry
         var debitEntry = new LedgerEntryReadModel
         {

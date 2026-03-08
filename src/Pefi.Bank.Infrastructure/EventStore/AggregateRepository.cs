@@ -1,9 +1,8 @@
 using Pefi.Bank.Domain;
-using Pefi.Bank.Infrastructure.ReadStore;
 
 namespace Pefi.Bank.Infrastructure.EventStore;
 
-public class AggregateRepository<T>(IEventStore eventStore ) : IAggregateRepository<T>
+public class AggregateRepository<T>(IEventStore eventStore) : IAggregateRepository<T>
     where T : Aggregate, new()
 {
     private static string StreamId(Guid id) => $"{typeof(T).Name}-{id}";

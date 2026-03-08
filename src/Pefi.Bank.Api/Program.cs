@@ -117,6 +117,5 @@ using (var scope = app.Services.CreateScope())
 
 
 app.Run();
-
 // Make the auto-generated Program class accessible for integration tests
 public partial class Program;

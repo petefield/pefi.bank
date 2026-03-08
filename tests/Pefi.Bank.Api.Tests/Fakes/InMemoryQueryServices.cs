@@ -23,11 +23,11 @@ public sealed class InMemoryAccountQueries(InMemoryReadStore readStore) : IAccou
     }
 }
 
-public sealed class InMemoryTransactionQueries(InMemoryReadStore readStore) : ITransactionQueries
+public sealed class InMemoryStatementEntryQueries(InMemoryReadStore readStore) : IStatementEntryQueries
 {
-    public async Task<IReadOnlyList<TransactionReadModel>> GetByAccountIdAsync(Guid accountId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<StatementEntryReadModel>> GetByAccountIdAsync(Guid accountId, CancellationToken ct = default)
     {
-        var all = await readStore.GetAllOfType<TransactionReadModel>("transaction");
+        var all = await readStore.GetAllOfType<StatementEntryReadModel>("statement-entry");
         return all.Where(t => t.AccountId == accountId).OrderByDescending(t => t.OccurredAt).ToList().AsReadOnly();
     }
 }
