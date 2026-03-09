@@ -102,6 +102,13 @@ public sealed class BankApiClient(HttpClient http)
                ?? [];
     }
 
+    // Transfers by account
+    public async Task<List<TransferReadModel>> GetTransfersForAccountAsync(Guid accountId)
+    {
+        return await http.GetFromJsonAsync<List<TransferReadModel>>($"accounts/{accountId}/transfers")
+               ?? [];
+    }
+
     private sealed record AccountCreatedResponse(Guid Id, string EventsUrl);
     public sealed record TransferInitiatedResponse(Guid Id, string Status, string EventsUrl);
 }

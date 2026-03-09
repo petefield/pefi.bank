@@ -3,6 +3,7 @@ using Pefi.Bank.Api.Extensions;
 using Pefi.Bank.Domain;
 using Pefi.Bank.Domain.Aggregates;
 using Pefi.Bank.Infrastructure.ReadStore;
+using Pefi.Bank.Shared;
 using Pefi.Bank.Shared.Commands;
 using Pefi.Bank.Shared.ReadModels;
 using StackExchange.Redis;
@@ -36,7 +37,7 @@ public static class TransferEndpoints
         if (sourceAccount.Version < 0)
             return Results.NotFound(new { error = "Source account not found." });
 
-        if (sourceAccount.CustomerId != authCustomerId)
+        if (sourceAccount.Id != WellKnownAccounts.SettlementAccountId &&  sourceAccount.CustomerId != authCustomerId)
             return Results.Forbid();
 
         var transferId = Guid.NewGuid();

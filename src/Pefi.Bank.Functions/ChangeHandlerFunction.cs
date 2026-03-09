@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using Pefi.Bank.Functions.Sagas;
 using Pefi.Bank.Infrastructure;
 using Pefi.Bank.Infrastructure.EventStore;
 using Pefi.Bank.Infrastructure.Serialization;

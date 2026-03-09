@@ -22,6 +22,7 @@ public static class AccountEndpoints
         group.MapPost("/{id:guid}/withdraw", Withdraw).WithName("Withdraw").RequireAuthorization();
         group.MapPost("/{id:guid}/close", CloseAccount).WithName("CloseAccount").RequireAuthorization();
         group.MapGet("/{id:guid}/transactions", GetTransactions).WithName("GetTransactions");
+        group.MapGet("/{id:guid}/transfers", GetTransfers).WithName("GetAccountTransfers");
         group.MapGet("/{id:guid}/events", SubscribeToAccountEvents).WithName("AccountEvents");
 
         // Nested under customers
@@ -129,6 +130,14 @@ public static class AccountEndpoints
     {
         var entries = await statementEntryQueries.GetByAccountIdAsync(id);
         return Results.Ok(entries);
+    }
+
+    private static async Task<IResult> GetTransfers(
+        Guid id,
+        ITransferQueries transferQueries)
+    {
+        var transfers = await transferQueries.GetByAccountIdAsync(id);
+        return Results.Ok(transfers);
     }
 
     private static async Task<IResult> GetCustomerAccounts(

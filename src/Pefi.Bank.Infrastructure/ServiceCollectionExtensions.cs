@@ -59,6 +59,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IStatementEntryQueries, CosmosStatementEntryQueries>();
         services.AddSingleton<ILedgerQueries, CosmosLedgerQueries>();
         services.AddSingleton<ICustomerQueries, CosmosCustomerQueries>();
+        services.AddSingleton<ITransferQueries, CosmosTransferQueries>();
 
         return services;
     }

@@ -155,6 +155,9 @@ else
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "from")]
+    public string? FromAccountId { get; set; }
+
     private List<AccountReadModel>? accounts;
     private string sourceAccountId = string.Empty;
     private string destinationAccountId = string.Empty;
@@ -172,6 +175,11 @@ else
         if (State.IsLoggedIn)
         {
             accounts = await Api.GetAccountsAsync(State.CustomerId!.Value);
+
+            if (!string.IsNullOrEmpty(FromAccountId))
+            {
+                sourceAccountId = FromAccountId;
+            }
         }
     }
 

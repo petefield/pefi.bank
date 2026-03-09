@@ -1,7 +1,7 @@
 using Pefi.Bank.Domain;
 using Pefi.Bank.Infrastructure.EventStore;
 
-namespace Pefi.Bank.Functions.Projections;
+namespace Pefi.Bank.Functions.Sagas;
 
 public interface ISagaExecutor
 {

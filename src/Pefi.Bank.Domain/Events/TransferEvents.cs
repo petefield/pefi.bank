@@ -19,6 +19,8 @@ public sealed record TransferSourceDebitCompensated(
 public sealed record TransferCompleted(
     Guid TransferId) : DomainEvent;
 
+
+
 public sealed record TransferFailed(
     Guid TransferId,
     string Reason) : DomainEvent;

@@ -71,11 +71,11 @@ public class Transfer : Aggregate
         RaiseEvent(new TransferCompleted(Id));
     }
 
+
     public void Fail(string reason)
     {
-        if (Status is not (TransferStatus.Initiated or TransferStatus.SourceDebited))
-            throw new DomainException("Transfer cannot be failed from its current state.");
-
+        if (Status == TransferStatus.Completed)
+            throw new DomainException("Cannot fail a completed transfer.");
         RaiseEvent(new TransferFailed(Id, reason));
     }
 

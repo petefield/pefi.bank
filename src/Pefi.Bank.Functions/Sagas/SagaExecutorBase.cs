@@ -4,7 +4,7 @@ using Pefi.Bank.Domain;
 using Pefi.Bank.Infrastructure;
 using Pefi.Bank.Infrastructure.EventStore;
 
-namespace Pefi.Bank.Functions.Projections;
+namespace Pefi.Bank.Functions.Sagas;
 
 public abstract class SagaExecutorBase<T>(ILogger logger) : ISagaExecutor where T : Aggregate
 {
@@ -33,6 +33,8 @@ public abstract class SagaExecutorBase<T>(ILogger logger) : ISagaExecutor where 
 
     public abstract Task SaveSaga(T saga);
 
+    public abstract void MarkSagaFailed(T saga, string reason);
+
     private readonly string TypeName = typeof(T).Name;
 
     protected async Task ExecuteStep(
@@ -49,17 +51,13 @@ public abstract class SagaExecutorBase<T>(ILogger logger) : ISagaExecutor where 
         try
         {
             await execute(item);
-            await SaveSaga(item);
             logger.LogInformation("Saga: {Type} {SagaId} Step [{StepName}] completed",
                TypeName, eventId, stepName);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Saga: {Type} {SagaId} Step [{StepName}] failed",
-                TypeName, eventId, stepName);
-
-            if (!markFailedOnError)
-                return;
+            logger.LogWarning(ex, "Saga: {Type} {SagaId} Step [{StepName}] failed: {ErrorMessage} , markFailedOnError={MarkFailedOnError}",
+                TypeName, eventId, stepName, ex.Message, markFailedOnError);
 
             if (compensate is not null)
             {
@@ -78,11 +76,16 @@ public abstract class SagaExecutorBase<T>(ILogger logger) : ISagaExecutor where 
                 }
             }
 
+            if (markFailedOnError)
+                MarkSagaFailed(item, $"Step [{stepName}] failed: {ex.Message}");
+
             DiagnosticConfig.SagasFailed.Add(1);
 
         }
         finally
         {
+                        await SaveSaga(item);
+
             var elapsedMs = Stopwatch.GetElapsedTime(stopwatch).TotalMilliseconds;
             DiagnosticConfig.SagaStepDuration.Record(elapsedMs,
                 new KeyValuePair<string, object?>("pefi.saga.step", stepName));

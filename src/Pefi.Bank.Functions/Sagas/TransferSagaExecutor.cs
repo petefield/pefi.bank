@@ -4,7 +4,7 @@ using Pefi.Bank.Domain.Aggregates;
 using Pefi.Bank.Domain.Events;
 using Pefi.Bank.Infrastructure.EventStore;
 
-namespace Pefi.Bank.Functions.Projections;
+namespace Pefi.Bank.Functions.Sagas;
 
 public class TransferSagaExecutor(
     IAggregateRepository<Account> accountRepo,
@@ -20,7 +20,25 @@ public class TransferSagaExecutor(
 
     public override async Task<Transfer> GetSaga(Guid id) => await transferRepo.LoadAsync(id);
 
-    public override async Task SaveSaga(Transfer saga) => await transferRepo.SaveAsync(saga);
+    public override async Task SaveSaga(Transfer saga) { 
+                logger.LogInformation("Saving TransferSaga {SagaId} ", saga.Id);
+
+        await transferRepo.SaveAsync(saga);
+        
+    }
+
+    public override void MarkSagaFailed(Transfer transfer, string reason)
+    {
+        logger.LogInformation("Marking TransferSaga {SagaId} as failed: {Reason}", transfer.Id, reason);
+        try
+        {
+            transfer.Fail(reason);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error while marking TransferSaga {SagaId} as failed: {ErrorMessage}", transfer.Id, ex.Message);
+        }
+    } 
 
     public override async Task HandleBase(DomainEvent @event, EventDocument document)
     {
@@ -86,4 +104,7 @@ public class TransferSagaExecutor(
                 break;
         }
     }
+
+
+        
 }
